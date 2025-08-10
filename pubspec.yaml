@@ -41,6 +41,10 @@ dependencies:
   smooth_page_indicator: ^1.2.1
   google_fonts: ^6.3.0
   fl_chart: ^0.71.0
+  file_picker: ^10.2.4
+  firebase_core: ^4.0.0
+  firebase_messaging: ^16.0.0
+  flutter_local_notifications: ^19.4.0
 
 dev_dependencies:
   flutter_test:

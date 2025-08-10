@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:ui';
 import 'login_screen.dart';
-import 'dashboard_screen.dart';
+import 'main_screen.dart'; // <-- MUDANÇA: Importa a nova tela principal
+import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -20,34 +21,50 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthStatus() async {
-    // Tenta ler o token do armazenamento seguro
     final token = await _storage.read(key: 'auth_token');
-
-    // Aguarda um instante para a tela de splash ser visível
-    await Future.delayed(const Duration(seconds: 1));
-
+    await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
-
     if (token != null) {
-      // Se encontrou um token, vai para o Dashboard
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
-      );
+          // ***** MUDANÇA AQUI *****
+          MaterialPageRoute(builder: (context) => const MainScreen()));
     } else {
-      // Se não encontrou, vai para a tela de Login
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+          MaterialPageRoute(builder: (context) => const LoginScreen()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Uma tela de carregamento simples
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
+    return Stack(
+      children: [
+        Container(decoration: AppTheme.backgroundDecoration),
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Center(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                child: Container(
+                  width: 200,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: AppTheme.glassColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: AppTheme.glassColor.withOpacity(0.3), width: 2),
+                  ),
+                  child: const Center(
+                    child:
+                        CircularProgressIndicator(color: AppTheme.accentColor),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

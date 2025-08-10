@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "333354619275",
+    "project_id": "dieta-mais-app-flutter",
+    "storage_bucket": "dieta-mais-app-flutter.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:333354619275:android:b047881b147b08c6581f8e",
+        "android_client_info": {
+          "package_name": "com.example.dieta_mais_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCyHMpAg_kwgyZd2Z4edPoScCBfaIlLKt0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
