@@ -6,6 +6,8 @@ import '../api/api_service.dart';
 import 'main_screen.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
+import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -96,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
-            title: const Text('Dieta+ App'),
+            //title: const Text('Dieta+ App'),
             centerTitle: true,
           ),
           body: Center(
@@ -107,6 +109,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
+                    Image.asset(
+                      'assets/logo_completa.png',
+                      height: 150, // Ajuste a altura como preferir
+                    ),
+                    const SizedBox(height: 48.0), // Espaçamento
                     TextFormField(
                       controller: _emailController,
                       decoration: const InputDecoration(
@@ -180,11 +187,43 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     const SizedBox(height: 16.0),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        // NAVEGA PARA A TELA DE ESQUECI A SENHA
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const ForgotPasswordScreen()),
+                        );
+                      },
                       child: const Text(
                         'Esqueci minha senha?',
                         style: TextStyle(color: AppTheme.secondaryTextColor),
                       ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Não tem uma conta?',
+                          style: TextStyle(color: AppTheme.secondaryTextColor),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            // Navega para a tela de registro
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (context) => const RegisterScreen()),
+                            );
+                          },
+                          child: const Text(
+                            'Cadastre-se',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromARGB(255, 242, 196, 245),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

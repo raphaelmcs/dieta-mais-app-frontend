@@ -1,18 +1,25 @@
 import 'dart:io';
 import 'dart:convert';
-import 'package:dieta_mais_app/models/food_suggestion.dart';
-import 'package:flutter/foundation.dart'
-    show kIsWeb; // Importante para detectar a web
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
-import '../models/daily_summary.dart'; // Importa nosso novo modelo
-import '../models/meal_log.dart';
+
+import '../models/daily_summary.dart';
 import '../models/diet_plan.dart';
+import '../models/food_suggestion.dart';
+import '../models/meal_log.dart';
+import '../models/user.dart';
 
 class ApiService {
-  // Esta lógica agora escolhe a URL base correta automaticamente!
   final String _baseUrl = kIsWeb
-      ? "http://127.0.0.1:8000/api/v1" // URL para quando estiver rodando na WEB
-      : "http://10.0.2.2:8000/api/v1"; // URL para quando estiver rodando no EMULADOR ANDROID
+      ? "http://127.0.0.1:8000/api/v1" // URL para Web
+      : "http://10.0.2.2:8000/api/v1"; // URL para Emulador Android
+
+  // Helper para formatar a data
+  String _formatDate(DateTime date) {
+    return "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+  }
+
+  // --- MÉTODOS DE AUTENTICAÇÃO ---
 
   Future<String> login(String email, String password) async {
     final response = await http.post(
@@ -21,35 +28,228 @@ class ApiService {
         'Content-Type': 'application/json; charset=UTF-8',
         'Accept': 'application/json',
       },
-      body: jsonEncode(<String, String>{
-        'email': email,
-        'password': password,
-      }),
+      body: jsonEncode(<String, String>{'email': email, 'password': password}),
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['token'];
+      return jsonDecode(response.body)['token'];
     } else {
-      final data = jsonDecode(response.body);
-      throw Exception(data['message'] ?? 'Falha ao fazer login.');
+      throw Exception(
+          jsonDecode(response.body)['message'] ?? 'Falha ao fazer login.');
     }
   }
 
-  Future<DailySummary> getDailySummary(String token) async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/daily-summary'),
+  Future<void> register({
+    required String name,
+    required String email,
+    String? phoneNumber,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final Map<String, String> body = {
+      'name': name,
+      'email': email,
+      'password': password,
+      'password_confirmation': passwordConfirmation,
+    };
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      body['phone_number'] = phoneNumber;
+    }
+
+    final response = await http.post(
+      Uri.parse('$_baseUrl/register'),
       headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
         'Accept': 'application/json',
-        'Authorization': 'Bearer $token', // Envia o token para autenticação
       },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode != 201) {
+      final data = jsonDecode(response.body);
+      final errorMessage =
+          (data['errors'] as Map<String, dynamic>).values.first[0];
+      throw Exception(errorMessage ?? 'Falha ao registrar.');
+    }
+  }
+
+  Future<String> forgotPassword({required String identifier}) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/forgot-password'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(<String, String>{'identifier': identifier}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return data['message'];
+    } else {
+      throw Exception(data['message'] ?? 'Falha ao solicitar código.');
+    }
+  }
+
+  Future<String> resetPassword({
+    required String identifier,
+    required String token,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/reset-password'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(<String, String>{
+        'identifier': identifier,
+        'token': token,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return data['message'];
+    } else {
+      throw Exception(data['message'] ?? 'Falha ao redefinir a senha.');
+    }
+  }
+
+  // --- MÉTODOS DO USUÁRIO ---
+
+  Future<User> getUser(String token) async {
+    // A rota para buscar o usuário autenticado é /api/user, não precisa de v1
+    final uri = kIsWeb
+        ? Uri.parse("http://127.0.0.1:8000/api/user")
+        : Uri.parse("http://10.0.2.2:8000/api/user");
+
+    final response = await http.get(
+      uri,
+      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return DailySummary.fromJson(data);
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Falha ao carregar os dados do usuário.');
+    }
+  }
+
+  Future<User> updateUserProfile({
+    required String token,
+    String? name, // Torna os parâmetros opcionais
+    String? email,
+    String? phoneNumber,
+  }) async {
+    final body = <String, String>{};
+    if (name != null) body['name'] = name;
+    if (email != null) body['email'] = email;
+    if (phoneNumber != null) body['phone_number'] = phoneNumber;
+
+    final response = await http.put(
+      Uri.parse('$_baseUrl/user/profile'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Falha ao atualizar o perfil.');
+    }
+  }
+
+  Future<String> changePassword({
+    required String token,
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/user/password'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(<String, String>{
+        'current_password': currentPassword,
+        'new_password': newPassword,
+        'new_password_confirmation': newPasswordConfirmation,
+      }),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 200) {
+      return data['message'];
+    } else {
+      throw Exception(data['message'] ?? 'Falha ao alterar a senha.');
+    }
+  }
+
+  // --- MÉTODOS DE DIETA E REFEIÇÕES ---
+
+  Future<void> uploadDietPdf(String token, File pdfFile) async {
+    final uri = Uri.parse('$_baseUrl/diets');
+    var request = http.MultipartRequest('POST', uri)
+      ..headers['Accept'] = 'application/json'
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(await http.MultipartFile.fromPath('diet_pdf', pdfFile.path));
+
+    final response = await http.Response.fromStream(await request.send());
+
+    if (response.statusCode != 201) {
+      throw Exception('Falha ao enviar o PDF. Status: ${response.statusCode}');
+    }
+  }
+
+  Future<DietPlan> getActiveDietPlan(String token) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/diets/active'),
+      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 200) {
+      return DietPlan.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Falha ao carregar o plano alimentar.');
+    }
+  }
+
+  Future<DailySummary> getDailySummary(String token, DateTime date) async {
+    final uri = Uri.parse('$_baseUrl/daily-summary').replace(
+      queryParameters: {'date': _formatDate(date)},
+    );
+    final response = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      return DailySummary.fromJson(jsonDecode(response.body));
     } else {
       throw Exception('Falha ao carregar o resumo diário.');
+    }
+  }
+
+  Future<List<MealLog>> getMealsForDate(String token, DateTime date) async {
+    final uri = Uri.parse('$_baseUrl/meal-logs').replace(
+      queryParameters: {'date': _formatDate(date)},
+    );
+    final response = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => MealLog.fromJson(json)).toList();
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(
+          'Falha ao carregar as refeições: ${errorData['message']}');
     }
   }
 
@@ -57,7 +257,7 @@ class ApiService {
     required String token,
     required int dietId,
     required String foodName,
-    required int quantity, // Agora é um int
+    required int quantity,
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/meal-logs'),
@@ -72,115 +272,8 @@ class ApiService {
         'quantity': quantity,
       }),
     );
-
     if (response.statusCode != 201) {
       throw Exception('Falha ao registrar a refeição.');
-    }
-  }
-
-  Future<List<FoodSuggestion>> getFoodSuggestions(
-      String token, String foodName) async {
-    // Prepara a URL com o parâmetro de query
-    final uri = Uri.parse('$_baseUrl/food-suggestions').replace(
-      queryParameters: {'food_name': foodName},
-    );
-
-    final response = await http.get(
-      uri,
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      // A API retorna um objeto {"suggestions": [...]}, então precisamos acessar a lista
-      List<dynamic> suggestionsList = data['suggestions'];
-      return suggestionsList
-          .map((json) => FoodSuggestion.fromJson(json))
-          .toList();
-    } else {
-      throw Exception('Falha ao buscar sugestões.');
-    }
-  }
-
-  Future<List<MealLog>> getTodaysMeals(String token) async {
-    final uri = Uri.parse('$_baseUrl/meal-logs/today');
-    print('📡 GET $uri');
-
-    final response = await http.get(
-      uri,
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    print('🔹 Status: ${response.statusCode}');
-    print('🔹 Body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      try {
-        final data = jsonDecode(response.body);
-        if (data is List) {
-          return data.map((json) => MealLog.fromJson(json)).toList();
-        } else {
-          throw Exception("Formato inesperado da resposta (não é lista)");
-        }
-      } catch (e) {
-        throw Exception("Erro ao processar refeições: $e");
-      }
-    } else {
-      throw Exception(
-          'Falha ao carregar as refeições do dia. Status: ${response.statusCode} | Body: ${response.body}');
-    }
-  }
-
-  // ***** NOVO MÉTODO PARA UPLOAD DE ARQUIVO *****
-  Future<void> uploadDietPdf(String token, File pdfFile) async {
-    final uri = Uri.parse('$_baseUrl/diets');
-
-    // Cria uma requisição do tipo multipart
-    var request = http.MultipartRequest('POST', uri);
-
-    // Adiciona os headers de autenticação
-    request.headers['Accept'] = 'application/json';
-    request.headers['Authorization'] = 'Bearer $token';
-
-    // Anexa o arquivo à requisição
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        'diet_pdf', // Este nome DEVE ser o mesmo que o backend espera
-        pdfFile.path,
-      ),
-    );
-
-    // Envia a requisição e espera a resposta
-    final streamedResponse = await request.send();
-
-    // Converte a resposta para um formato legível
-    final response = await http.Response.fromStream(streamedResponse);
-
-    if (response.statusCode != 201) {
-      throw Exception(
-          'Falha ao enviar o PDF. Status: ${response.statusCode} | Body: ${response.body}');
-    }
-  }
-
-  Future<DietPlan> getActiveDietPlan(String token) async {
-    final response = await http.get(
-      Uri.parse('$_baseUrl/diets/active'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      return DietPlan.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Falha ao carregar o plano alimentar.');
     }
   }
 
@@ -192,12 +285,31 @@ class ApiService {
         'Authorization': 'Bearer $token',
       },
     );
-
-    // 204 No Content é a resposta de sucesso para um DELETE
     if (response.statusCode != 204) {
       throw Exception('Falha ao deletar a refeição.');
     }
   }
+
+  Future<List<FoodSuggestion>> getFoodSuggestions(
+      String token, String foodName) async {
+    final uri = Uri.parse('$_baseUrl/food-suggestions').replace(
+      queryParameters: {'food_name': foodName},
+    );
+    final response = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      List<dynamic> suggestionsList = jsonDecode(response.body)['suggestions'];
+      return suggestionsList
+          .map((json) => FoodSuggestion.fromJson(json))
+          .toList();
+    } else {
+      throw Exception('Falha ao buscar sugestões.');
+    }
+  }
+
+  // --- MÉTODOS DE NOTIFICAÇÃO E CONFIGURAÇÕES ---
 
   Future<void> sendDeviceToken(String authToken, String fcmToken) async {
     final response = await http.post(
@@ -207,11 +319,8 @@ class ApiService {
         'Accept': 'application/json',
         'Authorization': 'Bearer $authToken',
       },
-      body: jsonEncode(<String, String>{
-        'fcm_token': fcmToken,
-      }),
+      body: jsonEncode(<String, String>{'fcm_token': fcmToken}),
     );
-
     if (response.statusCode != 200) {
       throw Exception('Falha ao registrar o token do dispositivo.');
     }
@@ -225,11 +334,8 @@ class ApiService {
         'Authorization': 'Bearer $token',
       },
     );
-
     if (response.statusCode == 200) {
-      // A API retorna um Map<String, dynamic>, convertemos para Map<String, bool>
-      final data = Map<String, bool>.from(jsonDecode(response.body));
-      return data;
+      return Map<String, bool>.from(jsonDecode(response.body));
     } else {
       throw Exception('Falha ao carregar as configurações.');
     }
@@ -246,7 +352,6 @@ class ApiService {
       },
       body: jsonEncode(settings),
     );
-
     if (response.statusCode != 200) {
       throw Exception('Falha ao atualizar as configurações.');
     }
