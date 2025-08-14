@@ -5,7 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart'; // 1. Importa o Fir
 import '../api/api_service.dart';
 import 'main_screen.dart';
 import '../theme/app_theme.dart';
-import '../widgets/gradient_scaffold.dart';
+//import '../widgets/gradient_scaffold.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 

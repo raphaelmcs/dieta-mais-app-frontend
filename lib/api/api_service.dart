@@ -8,6 +8,7 @@ import '../models/diet_plan.dart';
 import '../models/food_suggestion.dart';
 import '../models/meal_log.dart';
 import '../models/user.dart';
+import '../models/monthly_report.dart';
 
 class ApiService {
   final String _baseUrl = kIsWeb
@@ -354,6 +355,63 @@ class ApiService {
     );
     if (response.statusCode != 200) {
       throw Exception('Falha ao atualizar as configurações.');
+    }
+  }
+
+  Future<MonthlyReport> getMonthlyReport(
+      String token, int year, int month) async {
+    final uri = Uri.parse('$_baseUrl/reports/monthly').replace(
+      queryParameters: {
+        'year': year.toString(),
+        'month': month.toString(),
+      },
+    );
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return MonthlyReport.fromJson(jsonDecode(response.body));
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Falha ao carregar o relatório.');
+    }
+  }
+
+  Future<void> addHydrationLog(String token, int amount) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/hydration-logs'),
+      // HEADERS CORRIGIDOS (ADICIONADOS)
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'amount_ml': amount}),
+    );
+    if (response.statusCode != 201) {
+      throw Exception('Falha ao registrar consumo de água.');
+    }
+  }
+
+  Future<void> updateHydrationGoal(String token, int goal) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/user/hydration-goal'),
+      // HEADERS CORRIGIDOS (ADICIONADOS)
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'goal': goal}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Falha ao atualizar meta de hidratação.');
     }
   }
 }
