@@ -44,6 +44,37 @@ class AppTheme {
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: accentColor,
       ),
+      // Estilo padrão para todos os Dialogs (incluindo o month_picker)
+      dialogTheme: DialogThemeData(
+        backgroundColor: const Color.fromARGB(255, 232, 232, 247)
+            .withOpacity(0.5), // Fundo escuro e translúcido
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.0),
+          side: BorderSide(color: glassColor.withOpacity(0.8)), // Borda sutil
+        ),
+      ),
+      // Tema específico para o Date Picker (o calendário de dias)
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: AppTheme.glassColor.withOpacity(0.1), // Fundo de vidro
+        headerBackgroundColor: AppTheme.accentColor.withOpacity(0.1),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.0)),
+        headerHeadlineStyle: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primaryTextColor),
+        headerHelpStyle: TextStyle(
+            fontSize: 12, color: AppTheme.secondaryTextColor.withOpacity(0.8)),
+      ),
+
+      // Esquema de cores que afeta os componentes internos (como o calendário)
+      colorScheme: baseTheme.colorScheme.copyWith(
+        primary: accentColor, // Cor principal para seleções, etc.
+        onPrimary: Colors.black, // Cor do texto sobre a cor primária
+        surface:
+            baseTheme.scaffoldBackgroundColor, // Cor de fundo de superfícies
+        onSurface: primaryTextColor, // Cor do texto sobre as superfícies
+      ),
     );
   }
 }
