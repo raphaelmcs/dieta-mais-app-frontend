@@ -1,21 +1,22 @@
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
+// Seus imports de modelos
 import '../models/daily_summary.dart';
 import '../models/diet_plan.dart';
 import '../models/food_suggestion.dart';
 import '../models/meal_log.dart';
-import '../models/user.dart';
+import '../models/monthly_average.dart';
 import '../models/monthly_report.dart';
+import '../models/user.dart';
+import '../models/daily_calorie_log.dart';
 
 class ApiService {
-  final String _baseUrl = kIsWeb
-      ? "http://127.0.0.1:8000/api/v1" // URL para Web
-      : "http://10.0.2.2:8000/api/v1"; // URL para Emulador Android
+  final String _baseUrl =
+      kIsWeb ? "http://127.0.0.1:8000/api/v1" : "http://10.0.2.2:8000/api/v1";
 
-  // Helper para formatar a data
   String _formatDate(DateTime date) {
     return "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
@@ -236,6 +237,24 @@ class ApiService {
     }
   }
 
+  Future<List<MonthlyAverage>> getAnnualReport(String token, int year) async {
+    final uri = Uri.parse('$_baseUrl/reports/annual').replace(
+      queryParameters: {'year': year.toString()},
+    );
+    final response = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => MonthlyAverage.fromJson(json)).toList();
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(
+          errorData['message'] ?? 'Falha ao carregar o relatório anual.');
+    }
+  }
+
   Future<List<MealLog>> getMealsForDate(String token, DateTime date) async {
     final uri = Uri.parse('$_baseUrl/meal-logs').replace(
       queryParameters: {'date': _formatDate(date)},
@@ -355,6 +374,49 @@ class ApiService {
     );
     if (response.statusCode != 200) {
       throw Exception('Falha ao atualizar as configurações.');
+    }
+  }
+
+  Future<MonthlyReport> getWeeklyReport(String token, DateTime date) async {
+    final uri = Uri.parse('$_baseUrl/reports/weekly').replace(
+      queryParameters: {
+        'date': _formatDate(date)
+      }, // Envia um dia qualquer da semana
+    );
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return MonthlyReport.fromJson(jsonDecode(response.body));
+    } else {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Falha ao carregar o relatório.');
+    }
+  }
+
+  Future<List<DailyCalorieLog>> getMonthlyChartData(
+      String token, int year, int month) async {
+    final uri = Uri.parse('$_baseUrl/reports/monthly-chart').replace(
+      queryParameters: {
+        'year': year.toString(),
+        'month': month.toString(),
+      },
+    );
+    final response = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => DailyCalorieLog.fromJson(json)).toList();
+    } else {
+      throw Exception('Falha ao carregar dados do gráfico mensal.');
     }
   }
 

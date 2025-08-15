@@ -50,6 +50,7 @@ dependencies:
     sdk: flutter
   mask_text_input_formatter: ^2.9.0
   month_picker_dialog: ^6.4.1
+  share_plus: ^11.1.0
 
 dev_dependencies:
   flutter_test:
