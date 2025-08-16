@@ -1,18 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; // 1. Importa o pacote
+import 'package:flutter_localizations/flutter_localizations.dart';
+
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
+import 'providers/theme_provider.dart';
+import 'api/firebase_api.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  // await FirebaseApi().initNotifications(); // Comentado temporariamente se não estiver usando
+  await FirebaseApi().initNotifications();
 
-  runApp(const MyApp());
+  Animate.restartOnHotReload = true; // Opcional, mas ótimo para desenvolvimento
+  runApp(
+    // 1. O Provider agora "envolve" o nosso aplicativo
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -20,18 +32,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 2. O MyApp agora consegue encontrar o Provider, pois está "dentro" dele
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       title: 'Dieta+ App',
-      theme: AppTheme.darkTheme,
+      // O tema agora é dinâmico, vindo do Provider
+      theme: themeProvider.currentTheme.themeData,
 
-      // 2. ADICIONA AS CONFIGURAÇÕES DE LOCALIZAÇÃO
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [
-        Locale('pt', 'BR'), // Suporte para Português do Brasil
+        Locale('pt', 'BR'),
       ],
 
       home: const SplashScreen(),

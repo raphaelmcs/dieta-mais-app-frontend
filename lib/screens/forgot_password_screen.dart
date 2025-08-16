@@ -59,6 +59,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GradientScaffold(
       appBar: AppBar(title: const Text('Recuperar Senha')),
       body: Padding(
@@ -68,11 +69,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
+              Text(
                 'Digite seu telefone cadastrado para receber um código de recuperação via SMS.',
                 textAlign: TextAlign.center,
-                style:
-                    TextStyle(fontSize: 16, color: AppTheme.secondaryTextColor),
+                style: TextStyle(
+                    fontSize: 16, color: theme.textTheme.bodySmall?.color),
               ),
               const SizedBox(height: 24),
               TextFormField(
@@ -86,7 +87,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
               const SizedBox(height: 32),
               if (_isLoading)
-                const CircularProgressIndicator(color: AppTheme.accentColor)
+                CircularProgressIndicator(color: theme.primaryColor)
               else
                 SizedBox(
                   width: double.infinity,
@@ -96,11 +97,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppTheme.glassColor.withOpacity(0.15),
+                          color: AppThemes.glassColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(30),
                           border: Border.all(
                             width: 1.5,
-                            color: AppTheme.glassColor.withOpacity(0.2),
+                            color: AppThemes.glassColor.withOpacity(0.2),
                           ),
                         ),
                         child: ElevatedButton(

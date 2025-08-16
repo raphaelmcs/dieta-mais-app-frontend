@@ -1,13 +1,13 @@
 import 'dart:ui';
-import 'package:flutter/material.dart'; // <-- A LINHA QUE FALTAVA
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../api/api_service.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_theme.dart'; // A importação continua a mesma, mas o uso muda
 import '../widgets/gradient_scaffold.dart';
+import 'login_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
-
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
 }
@@ -71,6 +71,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Usamos o Theme.of(context) para pegar as cores do tema ativo
+    final theme = Theme.of(context);
+
     return GradientScaffold(
       appBar: AppBar(title: const Text('Alterar Senha')),
       body: SingleChildScrollView(
@@ -111,38 +114,29 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               ),
               const SizedBox(height: 32),
               if (_isLoading)
-                const CircularProgressIndicator(color: AppTheme.accentColor)
+                CircularProgressIndicator(
+                    color:
+                        theme.primaryColor) // Usa a cor de acento do tema ativo
               else
                 SizedBox(
                   width: double.infinity,
                   child: ClipRRect(
-                    // Para arredondar as bordas do efeito
                     borderRadius: BorderRadius.circular(30),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: AppTheme.glassColor.withOpacity(0.15),
+                          color: Colors.white
+                              .withOpacity(0.15), // Efeito de vidro é constante
                           borderRadius: BorderRadius.circular(30),
                           border: Border.all(
                             width: 1.5,
-                            color: AppTheme.glassColor.withOpacity(0.2),
+                            color: Colors.white.withOpacity(0.2),
                           ),
                         ),
                         child: ElevatedButton(
                           onPressed: _submitChangePassword,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'Salvar Nova Senha',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: const Text('Salvar Nova Senha'),
                         ),
                       ),
                     ),

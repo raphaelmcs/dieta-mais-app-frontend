@@ -37,6 +37,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GradientScaffold(
       appBar: AppBar(
         title: Text('Alternativas para ${widget.foodName}'),
@@ -46,8 +47,8 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
         future: _suggestionsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-                child: CircularProgressIndicator(color: AppTheme.accentColor));
+            return Center(
+                child: CircularProgressIndicator(color: theme.primaryColor));
           }
           if (snapshot.hasError) {
             return Center(
@@ -71,23 +72,25 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                         children: [
                           Text(
                             suggestion.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
-                              color: AppTheme.accentColor,
+                              color: theme.textTheme.bodySmall?.color,
                             ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Quantidade: ${suggestion.quantity}',
-                            style: const TextStyle(
-                                color: AppTheme.secondaryTextColor),
+                            style: TextStyle(
+                              color: theme.textTheme.bodySmall?.color,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             suggestion.reason,
-                            style: const TextStyle(
-                                color: AppTheme.primaryTextColor),
+                            style: TextStyle(
+                              color: theme.textTheme.bodySmall?.color,
+                            ),
                           ),
                         ],
                       ),

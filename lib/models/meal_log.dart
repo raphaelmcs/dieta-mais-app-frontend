@@ -6,6 +6,7 @@ class MealLog {
   final int protein;
   final int carbs;
   final int fats;
+  final DateTime consumedAt;
 
   MealLog({
     required this.id,
@@ -15,6 +16,7 @@ class MealLog {
     required this.protein,
     required this.carbs,
     required this.fats,
+    required this.consumedAt,
   });
 
   // Factory constructor para criar um MealLog a partir de um JSON
@@ -27,6 +29,7 @@ class MealLog {
       protein: (json['protein'] as num).toInt(),
       carbs: (json['carbs'] as num).toInt(),
       fats: (json['fats'] as num).toInt(),
+      consumedAt: DateTime.parse(json['consumed_at']),
     );
   }
 }

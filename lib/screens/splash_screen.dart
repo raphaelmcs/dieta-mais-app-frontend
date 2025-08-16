@@ -1,8 +1,10 @@
+import 'package:dieta_mais_app/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:ui';
 import 'login_screen.dart';
 import 'main_screen.dart'; // <-- MUDANÇA: Importa a nova tela principal
+import 'package:provider/provider.dart'; // Importa o provider
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -36,9 +38,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final background =
+        Provider.of<ThemeProvider>(context).currentTheme.background;
     return Stack(
       children: [
-        Container(decoration: AppTheme.backgroundDecoration),
+        Container(decoration: background),
         Scaffold(
           backgroundColor: Colors.transparent,
           body: Center(
@@ -50,14 +55,13 @@ class _SplashScreenState extends State<SplashScreen> {
                   width: 200,
                   height: 150,
                   decoration: BoxDecoration(
-                    color: AppTheme.glassColor.withOpacity(0.2),
+                    color: AppThemes.glassColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                        color: AppTheme.glassColor.withOpacity(0.3), width: 2),
+                        color: AppThemes.glassColor.withOpacity(0.3), width: 2),
                   ),
-                  child: const Center(
-                    child:
-                        CircularProgressIndicator(color: AppTheme.accentColor),
+                  child: Center(
+                    child: CircularProgressIndicator(color: theme.primaryColor),
                   ),
                 ),
               ),

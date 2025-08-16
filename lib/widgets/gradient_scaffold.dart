@@ -1,4 +1,6 @@
+import 'package:dieta_mais_app/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // Importa o provider
 import '../theme/app_theme.dart';
 
 class GradientScaffold extends StatelessWidget {
@@ -19,11 +21,13 @@ class GradientScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Pega o fundo do tema ativo através do Provider
+    final background =
+        Provider.of<ThemeProvider>(context).currentTheme.background;
+
     return Stack(
       children: [
-        Container(
-          decoration: AppTheme.backgroundDecoration,
-        ),
+        Container(decoration: background), // Usa o fundo dinâmico
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: appBar,

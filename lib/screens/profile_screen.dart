@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:dieta_mais_app/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // Importa o provider
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'change_password_screen.dart';
 import '../api/api_service.dart';
@@ -86,6 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     TextInputType keyboardType = TextInputType.text,
   }) async {
     final controller = TextEditingController(text: initialValue);
+    final theme = Theme.of(context);
 
     return showDialog<void>(
       context: context,
@@ -94,10 +97,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
           child: AlertDialog(
-            backgroundColor: AppTheme.glassColor.withOpacity(0.15),
+            backgroundColor: AppThemes.glassColor.withOpacity(0.15),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16.0),
-              side: BorderSide(color: AppTheme.glassColor.withOpacity(0.2)),
+              side: BorderSide(color: AppThemes.glassColor.withOpacity(0.2)),
             ),
             title: Text(title),
             content: TextField(
@@ -107,13 +110,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             actions: <Widget>[
               TextButton(
-                child: const Text('Cancelar',
-                    style: TextStyle(color: AppTheme.secondaryTextColor)),
+                child: Text('Cancelar',
+                    style: TextStyle(color: theme.textTheme.bodySmall?.color)),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               TextButton(
-                child: const Text('Salvar',
-                    style: TextStyle(color: AppTheme.accentColor)),
+                child: Text('Salvar',
+                    style: TextStyle(color: theme.textTheme.bodySmall?.color)),
                 onPressed: () async {
                   try {
                     await onSave(controller.text);
@@ -140,6 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _showLogoutConfirmationDialog() async {
+    final theme = Theme.of(context);
     return showDialog<void>(
       context: context,
       barrierColor: Colors.black.withOpacity(0.5),
@@ -147,18 +151,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
           child: AlertDialog(
-            backgroundColor: AppTheme.glassColor.withOpacity(0.15),
+            backgroundColor: AppThemes.glassColor.withOpacity(0.15),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16.0),
-              side: BorderSide(color: AppTheme.glassColor.withOpacity(0.2)),
+              side: BorderSide(color: AppThemes.glassColor.withOpacity(0.2)),
             ),
             title: const Text('Confirmar Saída'),
             content: const Text(
                 'Você tem certeza de que deseja sair do aplicativo?'),
             actions: <Widget>[
               TextButton(
-                child: const Text('Cancelar',
-                    style: TextStyle(color: AppTheme.secondaryTextColor)),
+                child: Text('Cancelar',
+                    style: TextStyle(color: theme.textTheme.bodySmall?.color)),
                 onPressed: () => Navigator.of(context).pop(),
               ),
               TextButton(
@@ -175,6 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GradientScaffold(
       appBar: AppBar(
         title: const Text('Perfil e Configurações'),
@@ -184,8 +189,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         future: _profileDataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-                child: CircularProgressIndicator(color: AppTheme.accentColor));
+            return Center(
+                child: CircularProgressIndicator(
+                    color: theme.textTheme.bodySmall?.color));
           }
           if (snapshot.hasError) {
             return Center(
@@ -263,16 +269,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   value: settings['wants_hydration_reminders'] ?? true,
                   onChanged: (bool value) => _updateSetting(
                       'wants_hydration_reminders', value, settings),
-                  activeColor: AppTheme.accentColor,
+                  activeColor: theme.textTheme.bodySmall?.color,
                 ),
                 SwitchListTile(
-                  title: const Text('Lembretes de refeições'),
-                  subtitle: const Text(
-                      'Receba um alerta no horário de cada refeição do seu plano.'),
-                  value: settings['wants_meal_reminders'] ?? true,
-                  onChanged: (bool value) =>
-                      _updateSetting('wants_meal_reminders', value, settings),
-                  activeColor: AppTheme.accentColor,
+                    title: const Text('Lembretes de refeições'),
+                    subtitle: const Text(
+                        'Receba um alerta no horário de cada refeição do seu plano.'),
+                    value: settings['wants_meal_reminders'] ?? true,
+                    onChanged: (bool value) =>
+                        _updateSetting('wants_meal_reminders', value, settings),
+                    activeColor: theme.textTheme.bodySmall?.color),
+                const SizedBox(height: 24),
+                _buildSectionTitle('Aparência'),
+// ListTile para abrir o seletor de tema
+                ListTile(
+                  leading: const Icon(Icons.palette_outlined),
+                  title: const Text('Tema do Aplicativo'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showThemePicker(context),
                 ),
                 const SizedBox(height: 24),
                 _buildSectionTitle('Segurança'),
@@ -297,10 +311,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const Divider(),
                 const SizedBox(height: 40),
-                const Center(
+                Center(
                   child: Text(
                     'Dieta+ App v1.0.0',
-                    style: TextStyle(color: AppTheme.secondaryTextColor),
+                    style: TextStyle(color: theme.textTheme.bodySmall?.color),
                   ),
                 ),
               ],
@@ -313,15 +327,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: AppTheme.accentColor),
+            color: theme.textTheme.bodySmall?.color),
       ),
+    );
+  }
+
+  void _showThemePicker(BuildContext context) {
+    final theme = Theme.of(context);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return ListView.builder(
+          itemCount: AppThemes.themeOptions.length,
+          itemBuilder: (context, index) {
+            final themeOption = AppThemes.themeOptions[index];
+            return ListTile(
+              title: Text(themeOption.name),
+              onTap: () {
+                themeProvider.setTheme(themeOption);
+                Navigator.of(context).pop();
+              },
+              trailing: themeProvider.currentTheme.name == themeOption.name
+                  ? Icon(Icons.check, color: theme.textTheme.bodySmall?.color)
+                  : null,
+            );
+          },
+        );
+      },
     );
   }
 }

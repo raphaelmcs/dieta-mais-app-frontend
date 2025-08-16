@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-//import 'package:google_fonts/google_fonts.dart';
+//import 'package:provider/provider.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -8,7 +9,6 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'dart:ui';
 
-import '../widgets/glass_dialog.dart';
 import 'login_screen.dart';
 import 'log_meal_screen.dart';
 import 'suggestion_screen.dart';
@@ -17,102 +17,65 @@ import '../models/daily_summary.dart';
 import '../models/macro_data.dart';
 import '../models/meal_log.dart';
 import '../theme/app_theme.dart';
+//import '../providers/theme_provider.dart';
 import '../widgets/gradient_scaffold.dart';
 import '../widgets/glassmorphic_container.dart';
+import '../models/dashboard_data.dart';
 
 // Helper class para conter todos os dados do dashboard
-class DashboardData {
+/* class DashboardData {
   final DailySummary summary;
   final List<MealLog> todaysMeals;
   DashboardData({required this.summary, required this.todaysMeals});
 }
-
+ */
+// O Dashboard agora é um StatelessWidget que recebe os dados de fora
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final Future<DashboardData>? dashboardDataFuture;
+  final VoidCallback onRefresh;
+  final Function(DateTime) onSelectDate;
+  final DateTime selectedDate;
+
+  const DashboardScreen({
+    super.key,
+    required this.dashboardDataFuture,
+    required this.onRefresh,
+    required this.onSelectDate,
+    required this.selectedDate,
+  });
+
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
   final _apiService = ApiService();
   final _storage = const FlutterSecureStorage();
   final _pageController = PageController();
   Future<DashboardData>? _dashboardDataFuture;
   DateTime _selectedDate = DateTime.now();
-
-  // Variável de estado para a lista de refeições, para permitir a remoção instantânea
-  List<MealLog> _mealsForSelectedDay = [];
+  late final AnimationController _buttonAnimationController;
 
   @override
   void initState() {
     super.initState();
     initializeDateFormatting('pt_BR', null);
     _dashboardDataFuture = _loadDashboardData(_selectedDate);
+    _buttonAnimationController =
+        AnimationController(vsync: this, duration: 150.ms);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _buttonAnimationController.dispose();
     super.dispose();
-  }
-
-  void _showUpdateGoalDialog(int currentGoal) {
-    final goalController = TextEditingController(text: currentGoal.toString());
-    showDialog(
-      context: context,
-      builder: (context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: AlertDialog(
-            title: const Text('Alterar Meta de Hidratação'),
-            content: TextField(
-              controller: goalController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Nova meta em ml'),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar')),
-              TextButton(
-                onPressed: () async {
-                  final goal = int.tryParse(goalController.text);
-                  if (goal != null && goal > 0) {
-                    try {
-                      final token = await _storage.read(key: 'auth_token');
-                      if (token == null) return;
-                      await _apiService.updateHydrationGoal(token, goal);
-                      Navigator.of(context).pop();
-                      // Recarrega os dados para mostrar a nova meta
-                      setState(() {
-                        _dashboardDataFuture =
-                            _loadDashboardData(_selectedDate);
-                      });
-                    } catch (e) {
-                      // Lógica para mostrar erro
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Erro ao salvar: $e'),
-                              backgroundColor: Colors.red),
-                        );
-                      }
-                    }
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   Future<DashboardData> _loadDashboardData(DateTime date) async {
     final token = await _storage.read(key: 'auth_token');
     if (token == null) {
-      // Usando um Future para navegar após o build para evitar erros de estado
       Future.microtask(() => _performLogout(context));
       throw Exception('Token de autenticação não encontrado.');
     }
@@ -120,39 +83,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _apiService.getDailySummary(token, date),
       _apiService.getMealsForDate(token, date),
     ]);
-    final data = DashboardData(
+    return DashboardData(
       summary: results[0] as DailySummary,
       todaysMeals: results[1] as List<MealLog>,
     );
-    // Atualiza a lista de estado sempre que novos dados são carregados
-    setState(() {
-      _mealsForSelectedDay = data.todaysMeals;
-    });
-    return data;
   }
 
-  Future<void> _deleteMealLog(int mealLogId, int index) async {
-    // Remove o item da lista local imediatamente para uma resposta visual rápida
+  Future<void> _reloadData() async {
     setState(() {
-      _mealsForSelectedDay.removeAt(index);
+      _dashboardDataFuture = _loadDashboardData(_selectedDate);
     });
+  }
+
+  void _reloadDataButton() async {
+    // 1. Marca a função como async
+    final token = await _storage.read(key: 'auth_token');
+    if (token == null) return;
+
+    // 2. A busca de dados acontece ANTES do setState
+    final future = _apiService.getDashboardData(token, _selectedDate);
+
+    // 3. O setState apenas atribui o resultado
+    setState(() {
+      _dashboardDataFuture = future;
+    });
+  }
+
+  Future<void> _deleteMealLog(int mealLogId) async {
     try {
       final token = await _storage.read(key: 'auth_token');
       if (token == null) throw Exception('Token não encontrado');
       await _apiService.deleteMealLog(token, mealLogId);
-
-      // Recarrega os dados do dashboard em segundo plano para atualizar os totais dos gráficos
-      _loadDashboardData(_selectedDate);
+      _reloadData();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Erro ao remover refeição: $e'),
-            backgroundColor: Colors.red),
-      );
-      // Se der erro, recarrega a lista para reverter a remoção visual
-      setState(() {
-        _dashboardDataFuture = _loadDashboardData(_selectedDate);
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Erro ao remover refeição: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -179,11 +149,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
             child: Container(
               decoration: BoxDecoration(
-                color: AppTheme.glassColor.withOpacity(0.2),
+                color: AppThemes.glassColor.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   width: 1.5,
-                  color: AppTheme.glassColor.withOpacity(0.3),
+                  color: AppThemes.glassColor.withOpacity(0.3),
                 ),
               ),
               // ***** A CORREÇÃO ESTÁ AQUI *****
@@ -192,7 +162,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 width: 300,
                 height: 420,
                 child: Theme(
-                  data: AppTheme.darkTheme,
+                  data: Theme.of(context),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -264,6 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildHydrationCard(HydrationData hydration) {
+    final theme = Theme.of(context);
     double percent =
         (hydration.goal > 0) ? (hydration.consumed / hydration.goal) : 0.0;
     int surplus = hydration.consumed - hydration.goal;
@@ -288,12 +259,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Text(
                           '${hydration.consumed} / ${hydration.goal} ml',
-                          style: const TextStyle(
-                              fontSize: 16, color: AppTheme.secondaryTextColor),
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: theme.textTheme.bodySmall?.color,
+                          ),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(Icons.edit_outlined,
-                            size: 18, color: AppTheme.secondaryTextColor),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: theme.textTheme.bodySmall?.color,
+                        ),
                       ],
                     ),
                   ),
@@ -341,57 +317,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ***** 3. MÉTODO PARA O DIÁLOGO DE ADICIONAR ÁGUA RESTAURADO *****
   void _showAddWaterDialog() {
     final amountController = TextEditingController();
+    // Formata a data selecionada para um formato legível
+    final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
     showDialog(
       context: context,
       builder: (context) {
         return BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: AlertDialog(
-              title: const Text('Adicionar Consumo de Água'),
-              content: TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: 'Quantidade em ml'),
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF2c2c2e).withOpacity(0.95),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.0)),
+            // Título do diálogo agora inclui a data
+            title: RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: Theme.of(context).textTheme.titleLarge,
+                children: <TextSpan>[
+                  const TextSpan(text: 'Adicionar Água\n'),
+                  TextSpan(
+                    text: 'em $formattedDate',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.normal,
+                      color: Theme.of(context).unselectedWidgetColor,
+                    ),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar')),
-                TextButton(
-                  onPressed: () async {
-                    final amount = int.tryParse(amountController.text);
-                    if (amount != null && amount > 0) {
-                      try {
-                        final token = await _storage.read(key: 'auth_token');
-                        if (token == null) return;
-                        await _apiService.addHydrationLog(token, amount);
-                        Navigator.of(context).pop();
-                        setState(() {
-                          _dashboardDataFuture =
-                              _loadDashboardData(_selectedDate);
-                        });
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Erro: $e'),
-                                backgroundColor: Colors.red),
-                          );
-                        }
+            ),
+            content: TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Quantidade em ml'),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () =>
+                      Navigator.of(context).pop(), // Usa o context do dialog
+                  child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () async {
+                  final amount = int.tryParse(amountController.text);
+                  if (amount != null && amount > 0) {
+                    // Fecha o diálogo ANTES de fazer a chamada de API
+                    Navigator.of(context).pop();
+                    try {
+                      final token = await _storage.read(key: 'auth_token');
+                      if (token == null) return;
+                      await _apiService.addHydrationLog(
+                        token: token,
+                        amount: amount,
+                        consumedAt: _selectedDate, // <-- PASSA A DATA
+                      );
+                      _reloadData(); // Recarrega os dados
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Erro: $e'),
+                              backgroundColor: Colors.red),
+                        );
                       }
                     }
-                  },
-                  child: const Text('Registrar'),
-                ),
-              ],
-            ));
+                  }
+                },
+                child: const Text('Registrar'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showUpdateGoalDialog(int currentGoal) {
+    final goalController = TextEditingController(text: currentGoal.toString());
+    showDialog(
+      context: context,
+      builder: (context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            title: const Text('Alterar Meta de Hidratação'),
+            content: TextField(
+              controller: goalController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Nova meta em ml'),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar')),
+              TextButton(
+                onPressed: () async {
+                  final goal = int.tryParse(goalController.text);
+                  if (goal != null && goal > 0) {
+                    try {
+                      final token = await _storage.read(key: 'auth_token');
+                      if (token == null) return;
+                      await _apiService.updateHydrationGoal(token, goal);
+                      Navigator.of(context).pop();
+                      _reloadData();
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Erro ao salvar: $e'),
+                              backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  }
+                },
+                child: const Text('Salvar'),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    //final themeProvider = Provider.of<ThemeProvider>(context);
     return GradientScaffold(
       appBar: AppBar(
         leadingWidth: 150, // Aumenta o espaço para o leading
@@ -417,17 +468,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () => setState(() =>
-                  _dashboardDataFuture = _loadDashboardData(_selectedDate))),
+            icon: const Icon(Icons.refresh),
+            onPressed:
+                _reloadDataButton, // onPressed agora chama o novo _reloadData
+          ),
         ],
       ),
       body: FutureBuilder<DashboardData>(
         future: _dashboardDataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-                child: CircularProgressIndicator(color: AppTheme.accentColor));
+            return Center(
+                child: CircularProgressIndicator(color: theme.primaryColor));
           }
           if (snapshot.hasError) {
             return Center(child: Text('Erro: ${snapshot.error}'));
@@ -436,109 +488,111 @@ class _DashboardScreenState extends State<DashboardScreen> {
             final summary = snapshot.data!.summary;
             final todaysMeals = snapshot.data!.todaysMeals;
 
-            return SingleChildScrollView(
-              child: Column(children: [
-                // ***** LAYOUT REORGANIZADO AQUI *****
-
-                // 1. CARD DE HIDRATAÇÃO VEM PRIMEIRO
-                _buildHydrationCard(summary.hydration),
-
-                const SizedBox(height: 24), // Espaçamento
-
-                // 2. CARROSSEL DE GRÁFICOS
-                SizedBox(
-                  height: 250,
-                  child: PageView(
-                    controller: _pageController,
-                    children: [
-                      _buildChartPage(
-                          'Consumido', summary.consumed, summary.targets,
-                          dietId: summary.dietId),
-                      _buildChartPage(
-                          'Restante', summary.remaining, summary.targets),
-                      _buildChartPage(
-                          'Metas', summary.targets, summary.targets),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: SmoothPageIndicator(
-                    controller: _pageController,
-                    count: 3,
-                    effect: const WormEffect(
-                      dotHeight: 8,
-                      dotWidth: 8,
-                      activeDotColor: AppTheme.accentColor,
-                      dotColor: Colors.white24,
+            return RefreshIndicator(
+              onRefresh: _reloadData,
+              child: SingleChildScrollView(
+                physics:
+                    const AlwaysScrollableScrollPhysics(), // Garante que o scroll sempre funcione
+                child: Column(children: [
+                  _buildHydrationCard(summary.hydration),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    height: 250,
+                    child: PageView(
+                      controller: _pageController,
+                      children: [
+                        _buildChartPage(
+                            'Consumido', summary.consumed, summary.targets,
+                            dietId: summary.dietId),
+                        _buildChartPage(
+                            'Restante', summary.remaining, summary.targets),
+                        _buildChartPage(
+                            'Metas', summary.targets, summary.targets),
+                      ],
                     ),
                   ),
-                ),
-
-                // 3. LISTA DE REFEIÇÕES
-                Text(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: SmoothPageIndicator(
+                      controller: _pageController,
+                      count: 3,
+                      effect: WormEffect(
+                        dotHeight: 8,
+                        dotWidth: 8,
+                        activeDotColor: theme.primaryColor,
+                        dotColor: Colors.white24,
+                      ),
+                    ),
+                  ),
+                  Text(
                     "Refeições de ${DateFormat('dd/MM/yyyy').format(_selectedDate)}",
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryTextColor)),
-                const SizedBox(height: 8),
-
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  itemCount: todaysMeals.length,
-                  itemBuilder: (context, index) {
-                    final meal = todaysMeals[index];
-                    return Dismissible(
-                      key: Key(meal.id.toString()),
-                      direction: DismissDirection.endToStart,
-                      onDismissed: (direction) {
-                        _deleteMealLog(meal.id, index);
-                      },
-                      background: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 2.0),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(12),
+                        color: theme.textTheme.bodyLarge?.color),
+                  ),
+                  const SizedBox(height: 8),
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: todaysMeals.length,
+                    itemBuilder: (context, index) {
+                      final meal = todaysMeals[index];
+                      return Dismissible(
+                        key: Key(meal.id.toString()),
+                        direction: DismissDirection.endToStart,
+                        onDismissed: (direction) {
+                          _deleteMealLog(meal.id);
+                        },
+                        background: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 2.0),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: const Icon(Icons.delete_forever,
+                              color: Colors.white),
                         ),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: const Icon(Icons.delete_forever,
-                            color: Colors.white),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: GlassmorphicContainer(
-                          borderRadius: 12,
-                          child: ListTile(
-                            dense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 0, horizontal: 16),
-                            title: Text(meal.foodName,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
-                            subtitle: Text(meal.quantity),
-                            trailing: Text('${meal.calories} kcal',
-                                style: const TextStyle(
-                                    color: Colors.orange,
-                                    fontWeight: FontWeight.bold)),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      SuggestionScreen(foodName: meal.foodName),
-                                ),
-                              );
-                            },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2.0),
+                          child: GlassmorphicContainer(
+                            borderRadius: 12,
+                            child: ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 0, horizontal: 16),
+                              title: Text(meal.foodName,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              subtitle: Text(meal.quantity),
+                              trailing: Text('${meal.calories} kcal',
+                                  style: const TextStyle(
+                                      color: Colors.orange,
+                                      fontWeight: FontWeight.bold)),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => SuggestionScreen(
+                                        foodName: meal.foodName),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ]),
+                      )
+                          .animate() // <-- Adiciona o gatilho da animação
+                          .fadeIn(duration: 500.ms) // Efeito de fade-in
+                          .slideY(
+                              begin: 0.5,
+                              end: 0); // Efeito de deslizar de baixo para cima
+                    },
+                  ),
+                ]),
+              ),
             );
           }
           return const Center(child: Text('Nenhum dado encontrado.'));
@@ -549,6 +603,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildChartPage(String title, AverageData data, AverageData targets,
       {int? dietId}) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         Text(
@@ -577,8 +632,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        const style = TextStyle(
-                            color: AppTheme.secondaryTextColor,
+                        final style = TextStyle(
+                            color: theme.textTheme.bodySmall?.color,
                             fontWeight: FontWeight.bold,
                             fontSize: 14);
                         String labelText;
@@ -612,8 +667,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Text(labelText, style: style),
                               const SizedBox(height: 2),
                               Text(valueText,
-                                  style: const TextStyle(
-                                      color: AppTheme.secondaryTextColor,
+                                  style: TextStyle(
+                                      color: theme.textTheme.bodySmall?.color,
                                       fontSize: 12)),
                             ],
                           ),
@@ -627,7 +682,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 gridData: const FlGridData(show: false),
                 barGroups: [
                   _makeBarGroup(
-                      0, data.calories.toDouble(), AppTheme.accentColor),
+                      0, data.calories.toDouble(), theme.primaryColor),
                   _makeBarGroup(
                       1, data.protein.toDouble() * 4, Colors.lightBlueAccent),
                   _makeBarGroup(
@@ -641,45 +696,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (title == 'Consumido')
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppTheme.glassColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      width: 1.5,
-                      color: AppTheme.glassColor.withOpacity(0.2),
-                    ),
-                  ),
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.of(context).push<bool>(
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                LogMealScreen(dietId: dietId!)),
-                      );
-                      if (result == true) {
-                        setState(() {
-                          _dashboardDataFuture =
-                              _loadDashboardData(_selectedDate);
-                        });
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 24),
-                    ),
-                    icon:
-                        const Icon(Icons.add, color: AppTheme.primaryTextColor),
-                    label: const Text('Registrar Refeição'),
-                  ),
+            child: GestureDetector(
+              onTapDown: (_) => _buttonAnimationController
+                  .forward(), // Inicia a animação ao pressionar
+              onTapUp: (_) => _buttonAnimationController
+                  .reverse(), // Reverte a animação ao soltar
+              onTapCancel: () => _buttonAnimationController
+                  .reverse(), // Reverte se o toque for cancelado
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                        builder: (context) => LogMealScreen(
+                            dietId: dietId!,
+                            date: _selectedDate)), // <-- PASSA A DATA
+                  );
+                  if (result == true) {
+                    _reloadData();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                  // Usando a cor de acento do tema ativo
+                  backgroundColor: theme.primaryColor.withOpacity(0.3),
+                  foregroundColor: theme.textTheme.bodyLarge?.color,
                 ),
-              ),
+                icon: const Icon(Icons.add),
+                label: const Text('Registrar Refeição'),
+              ).animate(controller: _buttonAnimationController).scale(
+                    begin: const Offset(1, 1), // Tamanho inicial (100%)
+                    end: const Offset(0.95, 0.95), // Tamanho final (95%)
+                    curve: Curves.easeOut,
+                  ),
             ),
           ),
       ],

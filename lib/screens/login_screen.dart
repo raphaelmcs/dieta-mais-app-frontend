@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart'; // 1. Importa o Fir
 import '../api/api_service.dart';
 import 'main_screen.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
+import 'package:provider/provider.dart';
 //import '../widgets/gradient_scaffold.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -92,9 +94,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final background =
+        Provider.of<ThemeProvider>(context).currentTheme.background;
     return Stack(
       children: [
-        Container(decoration: AppTheme.backgroundDecoration),
+        Container(decoration: background),
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
@@ -147,8 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 48.0),
                     if (_isLoading)
-                      const CircularProgressIndicator(
-                          color: AppTheme.accentColor)
+                      CircularProgressIndicator(color: theme.primaryColor)
                     else
                       SizedBox(
                         width: double.infinity,
@@ -158,11 +162,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: AppTheme.glassColor.withOpacity(0.15),
+                                color: AppThemes.glassColor.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(30),
                                 border: Border.all(
                                   width: 1.5,
-                                  color: AppTheme.glassColor.withOpacity(0.2),
+                                  color: AppThemes.glassColor.withOpacity(0.2),
                                 ),
                               ),
                               child: ElevatedButton(
@@ -195,17 +199,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                   const ForgotPasswordScreen()),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         'Esqueci minha senha?',
-                        style: TextStyle(color: AppTheme.secondaryTextColor),
+                        style:
+                            TextStyle(color: theme.textTheme.bodySmall?.color),
                       ),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           'Não tem uma conta?',
-                          style: TextStyle(color: AppTheme.secondaryTextColor),
+                          style: TextStyle(
+                              color: theme.textTheme.bodySmall?.color),
                         ),
                         TextButton(
                           onPressed: () {

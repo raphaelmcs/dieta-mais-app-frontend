@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../api/api_service.dart';
 import '../theme/app_theme.dart';
@@ -6,7 +7,9 @@ import '../widgets/gradient_scaffold.dart';
 
 class LogMealScreen extends StatefulWidget {
   final int dietId;
-  const LogMealScreen({super.key, required this.dietId});
+  final DateTime date; // <-- RECEBE A DATA
+
+  const LogMealScreen({super.key, required this.dietId, required this.date});
 
   @override
   State<LogMealScreen> createState() => _LogMealScreenState();
@@ -29,6 +32,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
   }
 
   Future<void> _submitMeal() async {
+    final consumedDate = DateFormat('yyyy-MM-dd').format(widget.date);
     if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isLoading = true);
 
@@ -40,7 +44,8 @@ class _LogMealScreenState extends State<LogMealScreen> {
           token: token,
           dietId: widget.dietId,
           foodName: _foodNameController.text,
-          quantity: int.parse(_quantityController.text), // Converte para int
+          quantity: int.parse(_quantityController.text),
+          consumedAt: widget.date, // <-- PASSA A DATA
         );
 
         if (mounted) {
@@ -71,6 +76,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return GradientScaffold(
       appBar: AppBar(title: const Text('Registrar Refeição')),
       body: SingleChildScrollView(
@@ -103,7 +109,7 @@ class _LogMealScreenState extends State<LogMealScreen> {
               ),
               const SizedBox(height: 32),
               if (_isLoading)
-                const CircularProgressIndicator(color: AppTheme.accentColor)
+                CircularProgressIndicator(color: theme.primaryColor)
               else
                 SizedBox(
                   width: double.infinity,
