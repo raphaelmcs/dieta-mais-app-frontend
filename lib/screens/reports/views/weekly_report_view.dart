@@ -44,29 +44,71 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
     return _apiService.getWeeklyReport(token, date);
   }
 
-  void _selectWeek() async {
-    // Usamos o seletor de dia normal para escolher um dia da semana desejada
-    final selectedDate = await showDatePicker(
+  Future<void> _selectWeek() async {
+    DateTime? tempSelectedDate = _selectedWeek;
+
+    final DateTime? picked = await showDialog<DateTime>(
       context: context,
-      initialDate: _selectedWeek,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      locale: const Locale('pt', 'BR'),
-      builder: (context, child) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-          child: Theme(
-            data: AppTheme.darkTheme.copyWith(
-              dialogBackgroundColor: AppTheme.glassColor.withOpacity(0.2),
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          contentPadding: EdgeInsets.zero,
+          insetPadding: const EdgeInsets.all(24),
+          content: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppThemes.glassColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  width: 1.5,
+                  color: AppThemes.glassColor.withOpacity(0.3),
+                ),
+              ),
+              child: Theme(
+                data: Theme.of(context), // Usa o tema ativo
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 300,
+                      child: CalendarDatePicker(
+                        initialDate: _selectedWeek,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                        onDateChanged: (DateTime date) {
+                          tempSelectedDate = date;
+                        },
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          child: const Text('CANCELAR'),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          child: const Text('OK'),
+                          onPressed: () {
+                            Navigator.of(context).pop(tempSelectedDate);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: child!,
           ),
         );
       },
     );
 
-    if (selectedDate != null) {
-      _loadReportForWeek(selectedDate);
+    if (picked != null) {
+      _loadReportForWeek(picked);
     }
   }
 
@@ -100,18 +142,18 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         TextButton.icon(
           onPressed: _selectWeek,
-          icon: const Icon(Icons.calendar_today_outlined,
-              color: AppTheme.accentColor),
+          icon: Icon(Icons.calendar_today_outlined, color: theme.primaryColor),
           label: Text(
             _formatWeekRange(_selectedWeek),
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.accentColor),
+                color: theme.primaryColor),
           ),
         ),
         Expanded(
@@ -119,9 +161,9 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
             future: _reportFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
+                return Center(
                     child:
-                        CircularProgressIndicator(color: AppTheme.accentColor));
+                        CircularProgressIndicator(color: theme.primaryColor));
               }
               if (snapshot.hasError) {
                 return _buildEmptyState();
@@ -154,7 +196,7 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
                       right: 16,
                       child: FloatingActionButton(
                         onPressed: () => _shareReport(report),
-                        backgroundColor: AppTheme.accentColor,
+                        backgroundColor: theme.primaryColor,
                         child: const Icon(Icons.share,
                             color: Color.fromARGB(255, 250, 122, 36)),
                       ),
@@ -171,13 +213,14 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
   }
 
   Widget _buildSectionTitle(String title) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Text(title,
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppTheme.accentColor)),
+              color: theme.primaryColor)),
     );
   }
 
@@ -185,8 +228,9 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.bar_chart, size: 80, color: AppTheme.secondaryTextColor),
+        children: [
+          Icon(Icons.bar_chart,
+              size: 80, color: Theme.of(context).unselectedWidgetColor),
           SizedBox(height: 16),
           Text('Nenhum dado encontrado para esta semana',
               textAlign: TextAlign.center, style: TextStyle(fontSize: 18)),
@@ -217,7 +261,9 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
       children: [
         Text(value,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(color: AppTheme.secondaryTextColor)),
+        Text(label,
+            style:
+                TextStyle(color: Theme.of(context).textTheme.bodySmall?.color))
       ],
     );
   }

@@ -46,18 +46,21 @@ class _AnnualReportViewState extends State<AnnualReportView> {
         return BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
             child: AlertDialog(
-              backgroundColor: AppTheme.glassColor.withOpacity(0.2),
+              backgroundColor: AppThemes.glassColor.withOpacity(0.2),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16.0),
-                side: BorderSide(color: AppTheme.glassColor.withOpacity(0.2)),
+                side: BorderSide(color: AppThemes.glassColor.withOpacity(0.2)),
               ),
               title: const Text("Selecione o Ano"),
               content: SizedBox(
                 width: 300,
                 height: 300,
                 child: Theme(
-                  data: AppTheme.darkTheme.copyWith(
-                    dialogBackgroundColor: Colors.transparent,
+                  data: Theme.of(context).copyWith(
+                    colorScheme: Theme.of(context).colorScheme.copyWith(
+                          primary: AppThemes.auroraPurpura.themeData
+                              .primaryColor, // Mantém a cor de destaque
+                        ),
                   ),
                   child: YearPicker(
                     firstDate: DateTime(2020),
@@ -76,18 +79,20 @@ class _AnnualReportViewState extends State<AnnualReportView> {
 
   @override
   Widget build(BuildContext context) {
+    // Pega o tema ativo para usar suas cores
+    final theme = Theme.of(context);
+
     return Column(
       children: [
         TextButton.icon(
           onPressed: _selectYear,
-          icon: const Icon(Icons.calendar_month_outlined,
-              color: AppTheme.accentColor),
+          icon: Icon(Icons.calendar_month_outlined, color: theme.primaryColor),
           label: Text(
             _selectedYear.toString(),
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.accentColor),
+                color: theme.primaryColor),
           ),
         ),
         Expanded(
@@ -95,9 +100,9 @@ class _AnnualReportViewState extends State<AnnualReportView> {
             future: _reportFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
+                return Center(
                     child:
-                        CircularProgressIndicator(color: AppTheme.accentColor));
+                        CircularProgressIndicator(color: theme.primaryColor));
               }
               if (snapshot.hasError) {
                 return _buildEmptyState();
@@ -106,7 +111,6 @@ class _AnnualReportViewState extends State<AnnualReportView> {
                 final reportData = snapshot.data!;
                 return Padding(
                   padding: const EdgeInsets.all(24.0),
-                  // GRÁFICO DE BARRAS ANUAL
                   child: BarChart(
                     BarChartData(
                       alignment: BarChartAlignment.spaceAround,
@@ -117,18 +121,23 @@ class _AnnualReportViewState extends State<AnnualReportView> {
                             sideTitles: SideTitles(showTitles: false)),
                         rightTitles: const AxisTitles(
                             sideTitles: SideTitles(showTitles: false)),
-                        leftTitles: const AxisTitles(
-                            sideTitles:
-                                SideTitles(showTitles: true, reservedSize: 40)),
+                        leftTitles: AxisTitles(
+                          sideTitles: const SideTitles(
+                              showTitles: true, reservedSize: 40),
+                          axisNameWidget: Text("Média de Kcal",
+                              style: TextStyle(
+                                  color: theme.textTheme.bodySmall?.color)),
+                          axisNameSize: 24,
+                        ),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
                             getTitlesWidget: (value, meta) {
-                              const style = TextStyle(
-                                  color: AppTheme.secondaryTextColor,
+                              // 'const' removido
+                              final style = TextStyle(
+                                  color: theme.textTheme.bodySmall?.color,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14);
-                              // Mapeia o número do mês para a inicial
                               const months = [
                                 'Jan',
                                 'Fev',
@@ -150,12 +159,16 @@ class _AnnualReportViewState extends State<AnnualReportView> {
                             },
                             reservedSize: 38,
                           ),
+                          axisNameWidget: Text("Mês",
+                              style: TextStyle(
+                                  color: theme.textTheme.bodySmall?.color)),
+                          axisNameSize: 24,
                         ),
                       ),
                       gridData: FlGridData(
                         show: true,
-                        getDrawingHorizontalLine: (value) => const FlLine(
-                            color: AppTheme.secondaryTextColor,
+                        getDrawingHorizontalLine: (value) => FlLine(
+                            color: theme.unselectedWidgetColor,
                             strokeWidth: 0.5),
                         drawVerticalLine: false,
                       ),
@@ -166,9 +179,18 @@ class _AnnualReportViewState extends State<AnnualReportView> {
                           barRods: [
                             BarChartRodData(
                               toY: monthlyData.averageCalories.toDouble(),
-                              color: AppTheme.accentColor,
+                              gradient: LinearGradient(
+                                colors: [
+                                  theme.primaryColor.withOpacity(0.8),
+                                  theme.primaryColor.withOpacity(0.4),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
                               width: 18,
                               borderRadius: BorderRadius.circular(4),
+                              borderSide: BorderSide(
+                                  color: theme.primaryColor, width: 1),
                             )
                           ],
                         );
@@ -186,14 +208,21 @@ class _AnnualReportViewState extends State<AnnualReportView> {
   }
 
   Widget _buildEmptyState() {
+    // Pega o tema ativo do contexto
+    final theme = Theme.of(context);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.show_chart, size: 80, color: AppTheme.secondaryTextColor),
-          SizedBox(height: 16),
-          Text('Nenhum dado encontrado para este ano.',
-              style: TextStyle(fontSize: 18)),
+        children: [
+          // Usa a cor de ícone do tema
+          Icon(Icons.show_chart,
+              size: 80, color: theme.iconTheme.color?.withOpacity(0.5)),
+          const SizedBox(height: 16),
+          const Text(
+            'Nenhum dado encontrado para este ano.',
+            style: TextStyle(fontSize: 18),
+          ),
         ],
       ),
     );

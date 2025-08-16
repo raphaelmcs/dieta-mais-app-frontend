@@ -51,6 +51,9 @@ dependencies:
   mask_text_input_formatter: ^2.9.0
   month_picker_dialog: ^6.4.1
   share_plus: ^11.1.0
+  shared_preferences: ^2.5.3
+  provider: ^6.1.5
+  flutter_animate: ^4.5.2
 
 dev_dependencies:
   flutter_test:

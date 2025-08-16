@@ -1,46 +1,102 @@
-import 'dart:ui'; // Import necessário para o ImageFilter
-import 'package:dieta_mais_app/screens/reports_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:provider/provider.dart';
+import 'dart:ui';
+
 import 'dashboard_screen.dart';
 import 'meal_plan_screen.dart';
 import 'profile_screen.dart';
-// import 'reports_screen.dart'; // Futura tela de relatórios
+import 'reports_screen.dart';
+import '../api/api_service.dart';
+import '../models/dashboard_data.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/gradient_scaffold.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
-
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  final _apiService = ApiService();
+  final _storage = const FlutterSecureStorage();
 
-  static const List<Widget> _widgetOptions = <Widget>[
-    DashboardScreen(),
-    MealPlanScreen(),
-    ReportsScreen(), // Placeholder
-    ProfileScreen(),
-  ];
+  // A lógica de dados do Dashboard agora vive aqui!
+  Future<DashboardData>? _dashboardDataFuture;
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadData();
+  }
+
+  void _reloadData() async {
+    final token = await _storage.read(key: 'auth_token');
+    if (token == null) return;
+    setState(() {
+      _dashboardDataFuture = _apiService.getDashboardData(token, _selectedDate);
+    });
+  }
+
+  void _onDateSelected(DateTime newDate) {
+    setState(() {
+      _selectedDate = newDate;
+      _reloadData();
+    });
+  }
 
   void _onItemTapped(int index) {
+    // Se o usuário clicar na aba "Resumo", recarrega os dados
+    if (index == 0) {
+      _reloadData();
+    }
     setState(() {
       _selectedIndex = index;
     });
   }
 
+  void _onDietActivated() {
+    // Apenas recarrega os dados do dashboard em segundo plano para quando o usuário voltar lá.
+    // A linha que mudava de aba foi removida.
+    _reloadData();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Usamos o GradientScaffold para ter o fundo correto
+    final theme = Theme.of(context);
+
+    final List<Widget> widgetOptions = <Widget>[
+      DashboardScreen(
+        dashboardDataFuture: _dashboardDataFuture,
+        onRefresh: _reloadData,
+        onSelectDate: (date) async {
+          final DateTime? picked = await showDatePicker(
+            context: context,
+            initialDate: date,
+            firstDate: DateTime(2020),
+            lastDate: DateTime.now(),
+            locale: const Locale('pt', 'BR'),
+          );
+          if (picked != null) {
+            _onDateSelected(picked);
+          }
+        },
+        selectedDate: _selectedDate,
+      ),
+      MealPlanScreen(onDietActivated: _onDietActivated),
+      const ReportsScreen(),
+      const ProfileScreen(),
+    ];
+
     return GradientScaffold(
-      // O body do nosso scaffold principal é a tela selecionada
       body: IndexedStack(
         index: _selectedIndex,
-        children: _widgetOptions,
+        children: widgetOptions,
       ),
-      // E aqui está a nossa barra de navegação customizada
       bottomNavigationBar: ClipRRect(
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(30.0),
@@ -50,10 +106,10 @@ class _MainScreenState extends State<MainScreen> {
           filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.glassColor.withOpacity(0.15),
+              color: AppThemes.glassColor.withOpacity(0.15),
               border: Border(
                 top: BorderSide(
-                  color: AppTheme.glassColor.withOpacity(0.2),
+                  color: AppThemes.glassColor.withOpacity(0.2),
                   width: 1.5,
                 ),
               ),
@@ -61,8 +117,8 @@ class _MainScreenState extends State<MainScreen> {
             child: BottomNavigationBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
-              selectedItemColor: const Color.fromARGB(255, 179, 117, 92),
-              unselectedItemColor: AppTheme.secondaryTextColor,
+              selectedItemColor: theme.primaryColor,
+              unselectedItemColor: theme.unselectedWidgetColor,
               items: const <BottomNavigationBarItem>[
                 BottomNavigationBarItem(
                   icon: Icon(Icons.home_filled),
@@ -83,8 +139,7 @@ class _MainScreenState extends State<MainScreen> {
               ],
               currentIndex: _selectedIndex,
               onTap: _onItemTapped,
-              type: BottomNavigationBarType
-                  .fixed, // Garante que todos os itens apareçam
+              type: BottomNavigationBarType.fixed,
             ),
           ),
         ),

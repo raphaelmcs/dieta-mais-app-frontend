@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:dieta_mais_app/models/macro_data.dart';
 import 'package:dieta_mais_app/models/monthly_report.dart';
 import 'package:dieta_mais_app/models/daily_calorie_log.dart';
+import 'package:dieta_mais_app/models/daily_hydration_log.dart';
 import 'package:dieta_mais_app/api/api_service.dart';
 import 'package:dieta_mais_app/theme/app_theme.dart';
 import 'package:dieta_mais_app/widgets/glassmorphic_container.dart';
@@ -15,7 +16,11 @@ import 'package:dieta_mais_app/widgets/glassmorphic_container.dart';
 class MonthlyReportFullData {
   final MonthlyReport report;
   final List<DailyCalorieLog> chartData;
-  MonthlyReportFullData({required this.report, required this.chartData});
+  final List<DailyHydrationLog> hydrationChartData;
+  MonthlyReportFullData(
+      {required this.report,
+      required this.chartData,
+      required this.hydrationChartData});
 }
 
 class MonthlyReportView extends StatefulWidget {
@@ -47,14 +52,18 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
     final token = await _storage.read(key: 'auth_token');
     if (token == null) throw Exception('Token não encontrado');
 
+    // Busca os três relatórios em paralelo
     final results = await Future.wait([
       _apiService.getMonthlyReport(token, year, month),
       _apiService.getMonthlyChartData(token, year, month),
+      _apiService.getMonthlyHydrationChartData(
+          token, year, month), // Nova chamada
     ]);
 
     return MonthlyReportFullData(
       report: results[0] as MonthlyReport,
       chartData: results[1] as List<DailyCalorieLog>,
+      hydrationChartData: results[2] as List<DailyHydrationLog>, // Novo dado
     );
   }
 
@@ -94,18 +103,20 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
 
   @override
   Widget build(BuildContext context) {
+    // Pega o tema ativo para usar suas cores
+    final theme = Theme.of(context);
+
     return Column(
       children: [
         TextButton.icon(
           onPressed: _selectMonth,
-          icon: const Icon(Icons.calendar_month_outlined,
-              color: AppTheme.accentColor),
+          icon: Icon(Icons.calendar_month_outlined, color: theme.primaryColor),
           label: Text(
             DateFormat.yMMMM('pt_BR').format(_selectedMonth),
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.accentColor),
+                color: theme.primaryColor),
           ),
         ),
         Expanded(
@@ -113,9 +124,9 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
             future: _reportFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
+                return Center(
                     child:
-                        CircularProgressIndicator(color: AppTheme.accentColor));
+                        CircularProgressIndicator(color: theme.primaryColor));
               }
               if (snapshot.hasError) {
                 return _buildEmptyState();
@@ -123,81 +134,34 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
               if (snapshot.hasData) {
                 final report = snapshot.data!.report;
                 final chartData = snapshot.data!.chartData;
-                return Stack(
-                  children: [
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSectionTitle(
-                              'Flutuação de Calorias (${DateFormat.yMMMM('pt_BR').format(_selectedMonth)})'),
-                          SizedBox(
-                            height: 200,
-                            child: LineChart(
-                              LineChartData(
-                                gridData: const FlGridData(show: false),
-                                titlesData: const FlTitlesData(
-                                  topTitles: AxisTitles(
-                                      sideTitles:
-                                          SideTitles(showTitles: false)),
-                                  rightTitles: AxisTitles(
-                                      sideTitles:
-                                          SideTitles(showTitles: false)),
-                                ),
-                                borderData: FlBorderData(
-                                  show: true,
-                                  border: Border.all(
-                                      color: AppTheme.secondaryTextColor
-                                          .withOpacity(0.5)),
-                                ),
-                                lineBarsData: [
-                                  LineChartBarData(
-                                    spots: chartData
-                                        .map((d) => FlSpot(d.day.toDouble(),
-                                            d.totalCalories.toDouble()))
-                                        .toList(),
-                                    isCurved: true,
-                                    color: AppTheme.accentColor,
-                                    barWidth: 4,
-                                    isStrokeCapRound: true,
-                                    dotData: const FlDotData(show: false),
-                                    belowBarData: BarAreaData(
-                                      show: true,
-                                      color:
-                                          AppTheme.accentColor.withOpacity(0.3),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildSectionTitle('Resumo do Mês'),
-                          GlassmorphicContainer(
-                              child: _buildMacrosGrid(report.averageMacros)),
-                          const SizedBox(height: 24),
-                          _buildSectionTitle('Top 5 Alimentos Consumidos'),
-                          GlassmorphicContainer(
-                              child: _buildTopFoodsList(report.topFoods)),
-                          const SizedBox(height: 24),
-                          _buildSectionTitle('Análise Dieta+'),
-                          GlassmorphicContainer(
-                              child: _buildAiAnalysis(report.aiAnalysis)),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: FloatingActionButton(
-                        onPressed: () => _shareReport(report),
-                        backgroundColor: AppTheme.accentColor,
-                        child: const Icon(Icons.share,
-                            color: Color.fromARGB(255, 250, 122, 36)),
-                      ),
-                    ),
-                  ],
+                final hydrationChartData = snapshot.data!.hydrationChartData;
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionTitle('Flutuação de Calorias'),
+                      _buildLineChart(chartData, theme.primaryColor,
+                          yAxisTitle: 'Kcal'),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Flutuação de Hidratação'),
+                      _buildLineChart(
+                          hydrationChartData, Colors.lightBlueAccent,
+                          yAxisTitle: 'ml', isHydration: true),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Resumo do Mês'),
+                      GlassmorphicContainer(
+                          child: _buildMacrosGrid(report.averageMacros)),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Top 5 Alimentos Consumidos'),
+                      GlassmorphicContainer(
+                          child: _buildTopFoodsList(report.topFoods)),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Análise Dieta+'),
+/*                       GlassmorphicContainer(
+                          child: _buildAiAnalysis(report.aiAnalysis)), */
+                    ],
+                  ),
                 );
               }
               return _buildEmptyState();
@@ -208,14 +172,89 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
     );
   }
 
+  Widget _buildLineChart(List<dynamic> chartData, Color color,
+      {required String yAxisTitle, bool isHydration = false}) {
+    final theme = Theme.of(context);
+    List<FlSpot> spots = chartData.map((d) {
+      final yValue =
+          isHydration ? d.totalMl.toDouble() : d.totalCalories.toDouble();
+      return FlSpot(d.day.toDouble(), yValue);
+    }).toList();
+
+    return SizedBox(
+      height: 200,
+      child: LineChart(
+        LineChartData(
+          gridData: const FlGridData(show: false),
+          titlesData: FlTitlesData(
+            show: true,
+            topTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: AxisTitles(
+              sideTitles: const SideTitles(showTitles: true, reservedSize: 40),
+              axisNameWidget: Text(yAxisTitle,
+                  style: TextStyle(color: theme.textTheme.bodySmall?.color)),
+              axisNameSize: 24,
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 30,
+                interval: 5,
+                getTitlesWidget: (value, meta) {
+                  if (value % 1 == 0) {
+                    return SideTitleWidget(
+                      meta: meta,
+                      child: Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                            color: theme.textTheme.bodySmall?.color,
+                            fontSize: 12),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              axisNameWidget: Text("Dia do Mês",
+                  style: TextStyle(color: theme.textTheme.bodySmall?.color)),
+              axisNameSize: 24,
+            ),
+          ),
+          borderData: FlBorderData(
+            show: true,
+            border:
+                Border.all(color: theme.unselectedWidgetColor.withOpacity(0.5)),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              color: color,
+              barWidth: 4,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                color: color.withOpacity(0.3),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Text(title,
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppTheme.accentColor)),
+              color: Theme.of(context).primaryColor)),
     );
   }
 
@@ -223,10 +262,11 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.bar_chart, size: 80, color: AppTheme.secondaryTextColor),
-          SizedBox(height: 16),
-          Text('Nenhum dado encontrado para este mês.',
+        children: [
+          Icon(Icons.bar_chart,
+              size: 80, color: Theme.of(context).unselectedWidgetColor),
+          const SizedBox(height: 16),
+          const Text('Nenhum dado encontrado para este mês.',
               style: TextStyle(fontSize: 18)),
         ],
       ),
@@ -255,7 +295,9 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
       children: [
         Text(value,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(color: AppTheme.secondaryTextColor)),
+        Text(label,
+            style:
+                TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
       ],
     );
   }
