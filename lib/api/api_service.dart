@@ -16,6 +16,8 @@ import '../models/user.dart';
 import '../models/daily_calorie_log.dart';
 import '../models/daily_hydration_log.dart';
 import '../models/dashboard_data.dart';
+import '../models/recalculated_diet.dart';
+import '../models/recalculation_result.dart';
 
 class ApiService {
   final String _baseUrl =
@@ -572,5 +574,38 @@ class ApiService {
       summary: results[0] as DailySummary,
       todaysMeals: results[1] as List<MealLog>,
     );
+  }
+
+  // Agora retorna o ID do novo plano
+  Future<RecalculationResult> recalculateDiet(String token) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/diets/recalculate'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return RecalculationResult.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Falha ao recalcular a dieta.');
+    }
+  }
+
+  Future<DietPlan> getDietPlanDetails(String token, int dietId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/diets/$dietId'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return DietPlan.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Falha ao carregar detalhes do plano.');
+    }
   }
 }

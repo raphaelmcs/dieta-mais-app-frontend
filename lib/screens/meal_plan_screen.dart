@@ -1,19 +1,18 @@
 import 'dart:io';
 import 'dart:ui';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
-import 'create_diet_screen.dart';
-import 'suggestion_screen.dart';
 import '../api/api_service.dart';
 import '../models/diet_plan.dart';
-import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
-import '../widgets/gradient_scaffold.dart';
 import '../widgets/glassmorphic_container.dart';
+import '../widgets/gradient_scaffold.dart';
+import 'create_diet_screen.dart';
+import 'diet_plan_detail_screen.dart';
 
 class MealPlanScreen extends StatefulWidget {
   final VoidCallback onDietActivated;
@@ -169,36 +168,46 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                       leading: plan.isActive
                           ? const Icon(Icons.check_circle, color: Colors.green)
                           : const Icon(Icons.radio_button_unchecked),
-                      trailing: PopupMenuButton(
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                              value: 'activate', child: Text('Ativar')),
-                          const PopupMenuItem(
-                              value: 'delete', child: Text('Excluir')),
-                        ],
-                        onSelected: (value) async {
+                      trailing: PopupMenuButton<String>(
+                        // Define o tipo como String
+                        onSelected: (String value) async {
                           final token = await _storage.read(key: 'auth_token');
                           if (token == null) return;
 
-                          if (value == 'activate') {
+                          if (value == 'view') {
+                            // NAVEGAÇÃO PARA A TELA DE DETALHES
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    DietPlanDetailScreen(dietPlanId: plan.id),
+                              ),
+                            );
+                          } else if (value == 'activate') {
                             await _apiService.setActiveDiet(token, plan.id);
-                            // Mostra a mensagem de sucesso
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Plano alimentar ativado com sucesso!'),
-                                    backgroundColor: Colors.green),
-                              );
-                            }
-                            widget
-                                .onDietActivated(); // Avisa a MainScreen para recarregar o dashboard
-                            _loadPlans(); // Recarrega a lista NESTA tela
+                            widget.onDietActivated();
+                            _loadPlans();
                           } else if (value == 'delete') {
                             await _apiService.deleteDiet(token, plan.id);
+                            _loadPlans();
                           }
-                          _loadPlans();
                         },
+                        itemBuilder: (BuildContext context) =>
+                            <PopupMenuEntry<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'view',
+                            child: Text('Visualizar'),
+                          ),
+                          if (!plan.isActive)
+                            const PopupMenuItem<String>(
+                              value: 'activate',
+                              child: Text('Definir como Ativo'),
+                            ),
+                          const PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Text('Excluir',
+                                style: TextStyle(color: Colors.redAccent)),
+                          ),
+                        ],
                       ),
                     ),
                   ),

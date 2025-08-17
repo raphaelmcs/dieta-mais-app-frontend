@@ -1,10 +1,10 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../api/api_service.dart';
-import '../theme/app_theme.dart'; // A importação continua a mesma, mas o uso muda
 import '../widgets/gradient_scaffold.dart';
-import 'login_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});

@@ -1,17 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:provider/provider.dart';
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../api/api_service.dart';
+import '../models/dashboard_data.dart';
+import '../theme/app_theme.dart';
+import '../widgets/gradient_scaffold.dart';
 import 'dashboard_screen.dart';
 import 'meal_plan_screen.dart';
 import 'profile_screen.dart';
 import 'reports_screen.dart';
-import '../api/api_service.dart';
-import '../models/dashboard_data.dart';
-import '../theme/app_theme.dart';
-import '../providers/theme_provider.dart';
-import '../widgets/gradient_scaffold.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});

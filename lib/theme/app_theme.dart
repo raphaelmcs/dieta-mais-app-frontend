@@ -72,8 +72,13 @@ class AppThemes {
   // Tema 4: Preto & Branco (Minimalista)
   static final AppThemeOption pretoEBranco = AppThemeOption(
     name: 'Preto & Branco',
+    // O fundo agora é um gradiente sutil para o efeito de vidro funcionar
     background: const BoxDecoration(
-      color: Color(0xFF121212), // Fundo preto sólido
+      gradient: LinearGradient(
+        colors: [Color(0xFF2E2E2E), Color(0xFF1a1a1a)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
     ),
     themeData: _buildTheme(
       accentColor: Colors.white, // Acento branco

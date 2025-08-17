@@ -7,6 +7,7 @@ import 'package:percent_indicator/percent_indicator.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter/services.dart';
 import 'dart:ui';
 
 import 'login_screen.dart';
@@ -18,9 +19,12 @@ import '../models/macro_data.dart';
 import '../models/meal_log.dart';
 import '../theme/app_theme.dart';
 //import '../providers/theme_provider.dart';
+import '../models/recalculated_diet.dart';
 import '../widgets/gradient_scaffold.dart';
 import '../widgets/glassmorphic_container.dart';
 import '../models/dashboard_data.dart';
+import '../models/recalculation_result.dart';
+import 'diet_plan_detail_screen.dart';
 
 // Helper class para conter todos os dados do dashboard
 /* class DashboardData {
@@ -57,6 +61,10 @@ class _DashboardScreenState extends State<DashboardScreen>
   DateTime _selectedDate = DateTime.now();
   late final AnimationController _buttonAnimationController;
 
+  bool _hasNewRecalculatedPlan = false;
+  int? _newPlanId;
+  RecalculatedDiet? _lastRecalculationAnalysis; // Guarda a análise da IA
+
   @override
   void initState() {
     super.initState();
@@ -92,20 +100,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   Future<void> _reloadData() async {
     setState(() {
       _dashboardDataFuture = _loadDashboardData(_selectedDate);
-    });
-  }
-
-  void _reloadDataButton() async {
-    // 1. Marca a função como async
-    final token = await _storage.read(key: 'auth_token');
-    if (token == null) return;
-
-    // 2. A busca de dados acontece ANTES do setState
-    final future = _apiService.getDashboardData(token, _selectedDate);
-
-    // 3. O setState apenas atribui o resultado
-    setState(() {
-      _dashboardDataFuture = future;
     });
   }
 
@@ -208,6 +202,158 @@ class _DashboardScreenState extends State<DashboardScreen>
         _dashboardDataFuture = _loadDashboardData(picked);
       });
     }
+  }
+
+// A lógica de Recálculo agora recebe os dados necessários como parâmetros
+  Future<void> _handleOffPlanMeal(DailySummary summary) async {
+    final mealWasLogged = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) =>
+            LogMealScreen(dietId: summary.dietId!, date: widget.selectedDate),
+      ),
+    );
+    if (mealWasLogged == true && mounted) {
+      final wantsToRecalculate = await _showRecalculationConfirmationDialog();
+      if (wantsToRecalculate == true) {
+        _triggerRecalculation();
+      }
+    }
+  }
+
+  // MÉTODO QUE MOSTRA A CONFIRMAÇÃO
+  Future<bool?> _showRecalculationConfirmationDialog() {
+    return showDialog<bool>(
+      context: context,
+      // Torna a barreira semi-transparente para o desfoque ser visível
+      barrierColor: Colors.black.withOpacity(0.5),
+      builder: (context) {
+        // Adiciona o BackdropFilter para embaçar o fundo
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            // Opcional: ajusta a cor de fundo do AlertDialog para combinar
+            backgroundColor: AppThemes.glassColor.withOpacity(0.15),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+              side: BorderSide(color: AppThemes.glassColor.withOpacity(0.2)),
+            ),
+            title: const Text('Ajustar o Dia?'),
+            content: const Text(
+                'Percebemos uma refeição não planejada. Deseja que o Dieta+ ajuste as refeições restantes do seu dia para compensar?'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Não')),
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Sim, ajustar!')),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _triggerRecalculation() async {
+    try {
+      final token = await _storage.read(key: 'auth_token');
+      if (token == null) throw Exception('Token não encontrado');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Aguarde, a Dieta+ está recalculando seu dia...')),
+      );
+
+      // A API agora retorna o ID e a análise
+      final result = await _apiService.recalculateDiet(token);
+
+      if (mounted) {
+        // Guarda os resultados no estado
+        setState(() {
+          _hasNewRecalculatedPlan = true;
+          _newPlanId = result.newDietId;
+          _lastRecalculationAnalysis = result.analysis;
+        });
+
+        widget.onRefresh(); // Recarrega os dados do dashboard
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showRecalculatedPlanDialog() {
+    if (_lastRecalculationAnalysis == null || _newPlanId == null) return;
+
+    final plan = _lastRecalculationAnalysis!;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: AlertDialog(
+            backgroundColor: AppThemes.glassColor.withOpacity(0.2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.0),
+              side: BorderSide(color: AppThemes.glassColor.withOpacity(0.2)),
+            ),
+            title: const Text('Plano Ajustado pela Dieta+'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    plan.analysis,
+                    style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).textTheme.bodySmall?.color),
+                  ),
+                  const Divider(height: 24),
+                  const Text('Refeições Restantes Sugeridas:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  ...plan.remainingMeals.map((meal) => Text('• ${meal.name}')),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Fechar'),
+              ),
+              // BOTÃO PARA VER O PLANO COMPLETO
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Fecha o diálogo
+                  Navigator.of(context)
+                      .push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          DietPlanDetailScreen(dietPlanId: _newPlanId!),
+                    ),
+                  )
+                      .then((_) {
+                    // Reseta o estado da notificação
+                    setState(() {
+                      _hasNewRecalculatedPlan = false;
+                      _newPlanId = null;
+                      _lastRecalculationAnalysis = null;
+                    });
+                  });
+                },
+                child: const Text('Ver Plano Detalhado'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   LinearGradient _getHydrationGradient(double percent) {
@@ -467,10 +613,16 @@ class _DashboardScreenState extends State<DashboardScreen>
         title: const Text(''),
         centerTitle: true,
         actions: [
+          // O ÍCONE AGORA CHAMA O DIÁLOGO DE ANÁLISE
+          if (_hasNewRecalculatedPlan)
+            IconButton(
+              icon: const Icon(Icons.notifications_active,
+                  color: Colors.yellowAccent),
+              onPressed: _showRecalculatedPlanDialog,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed:
-                _reloadDataButton, // onPressed agora chama o novo _reloadData
+            onPressed: widget.onRefresh,
           ),
         ],
       ),
@@ -591,6 +743,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                               end: 0); // Efeito de deslizar de baixo para cima
                     },
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
+                    child: TextButton.icon(
+                      // A CHAMADA AGORA É FEITA AQUI, COM OS DADOS JÁ CARREGADOS
+                      onPressed: () => _handleOffPlanMeal(summary),
+                      icon: const Icon(Icons.warning_amber_rounded, size: 20),
+                      label: const Text('Refeição fora do plano?'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.yellow[700],
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    ),
+                  )
                 ]),
               ),
             );
@@ -705,6 +871,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   .reverse(), // Reverte se o toque for cancelado
               child: ElevatedButton.icon(
                 onPressed: () async {
+                  HapticFeedback.lightImpact();
                   final result = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                         builder: (context) => LogMealScreen(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl/intl.dart';
+
 import '../api/api_service.dart';
-import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
 
 class LogMealScreen extends StatefulWidget {

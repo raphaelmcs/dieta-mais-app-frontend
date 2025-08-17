@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../api/api_service.dart';
-import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
 
 // Classes de modelo para ajudar a gerenciar o estado do formulário
@@ -207,7 +207,7 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
                       const InputDecoration(labelText: 'Horário (ex: 08:00)')),
               const SizedBox(height: 8),
               ...meal.foods.asMap().entries.map((foodEntry) {
-                int foodIndex = foodEntry.key;
+                //int foodIndex = foodEntry.key;
                 FoodEntry food = foodEntry.value;
                 return Row(
                   children: [
