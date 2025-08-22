@@ -125,6 +125,86 @@ class ApiService {
     }
   }
 
+  Future<void> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    final url = Uri.parse('$_baseUrl/email/verify-code');
+
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json', // força respostas JSON do Laravel
+    };
+
+    final body = jsonEncode({
+      'email': email.trim().toLowerCase(),
+      'code': code.trim(),
+    });
+
+    final response = await http.post(url, headers: headers, body: body);
+
+    // ==== DEBUG ÚTIL (remova em produção) ====
+    // ignore: avoid_print
+    print(
+        '[verifyEmailCode] -> ${response.request?.method} ${response.request?.url}');
+    // ignore: avoid_print
+    print('[verifyEmailCode] <- status: ${response.statusCode}');
+    // ignore: avoid_print
+    print(
+        '[verifyEmailCode] <- content-type: ${response.headers['content-type']}');
+    // =========================================
+
+    final contentType = response.headers['content-type'] ?? '';
+
+    // 200 OK -> sucesso
+    if (response.statusCode == 200) return;
+
+    // Se não vier JSON, provavelmente é HTML de erro/redirect (rota errada/host errado)
+    if (!contentType.toLowerCase().contains('application/json')) {
+      final snippet = response.body.length > 200
+          ? '${response.body.substring(0, 200)}...'
+          : response.body;
+      throw Exception(
+        'Falha ao verificar email (status ${response.statusCode}). '
+        'Conteúdo não-JSON recebido. '
+        'Verifique a URL/host/rota. Resumo: $snippet',
+      );
+    }
+
+    // Se veio JSON, tentamos extrair a mensagem
+    try {
+      final data = jsonDecode(response.body);
+      final msg = data is Map && data['message'] != null
+          ? data['message'].toString()
+          : 'Falha ao verificar email.';
+      throw Exception(msg);
+    } catch (_) {
+      throw Exception('Falha ao verificar email: ${response.body}');
+    }
+  }
+
+  Future<void> resendEmailCode({required String email}) async {
+    final url = Uri.parse('$_baseUrl/email/resend-code');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({'email': email.trim().toLowerCase()}),
+    );
+
+    if (response.statusCode == 200) return;
+
+    try {
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Falha ao reenviar código.');
+    } catch (_) {
+      throw Exception('Falha ao reenviar código: ${response.body}');
+    }
+  }
+
   // --- MÉTODOS DO USUÁRIO ---
 
   Future<User> getUser(String token) async {
