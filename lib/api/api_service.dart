@@ -16,7 +16,7 @@ import '../models/user.dart';
 import '../models/daily_calorie_log.dart';
 import '../models/daily_hydration_log.dart';
 import '../models/dashboard_data.dart';
-import '../models/recalculated_diet.dart';
+//import '../models/recalculated_diet.dart';
 import '../models/recalculation_result.dart';
 
 class ApiService {
@@ -545,9 +545,15 @@ class ApiService {
   Future<void> setActiveDiet(String token, int dietId) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/diets/$dietId/activate'),
-      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
+      // Adicionamos os headers que estavam faltando
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
     );
-    if (response.statusCode != 200) throw Exception('Falha ao ativar o plano.');
+    if (response.statusCode != 200) {
+      throw Exception('Falha ao ativar o plano.');
+    }
   }
 
   Future<void> deleteDiet(String token, int dietId) async {
@@ -606,6 +612,33 @@ class ApiService {
       return DietPlan.fromJson(jsonDecode(response.body));
     } else {
       throw Exception('Falha ao carregar detalhes do plano.');
+    }
+  }
+
+  Future<bool> checkUserStatus(String token) async {
+    final uri = Uri.parse('${_baseUrl.replaceAll("/v1", "")}/user/status');
+    final response = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body)['has_active_diet'];
+    }
+    return false; // Assume que não tem plano se a chamada falhar
+  }
+
+  Future<List<DietPlan>> getDietPlans(String token) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/diets'),
+      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode == 200) {
+      List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => DietPlan.fromJson(json)).toList();
+    } else {
+      throw Exception('Falha ao carregar planos alimentares.');
     }
   }
 }

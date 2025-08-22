@@ -1,39 +1,52 @@
 import 'dart:ui';
-
+import 'package:dieta_mais_app/models/dashboard_data.dart';
+import 'package:dieta_mais_app/models/diet_plan.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/api_service.dart';
-import '../models/dashboard_data.dart';
 import '../theme/app_theme.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/gradient_scaffold.dart';
-import 'dashboard_screen.dart';
+import 'dashboard/dashboard_screen.dart';
 import 'meal_plan_screen.dart';
 import 'profile_screen.dart';
 import 'reports_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int initialIndex;
+  const MainScreen({super.key, this.initialIndex = 0});
+
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
   final _apiService = ApiService();
   final _storage = const FlutterSecureStorage();
 
-  // A lógica de dados do Dashboard agora vive aqui!
+  // O estado do Dashboard e dos Planos vive aqui
   Future<DashboardData>? _dashboardDataFuture;
+  Future<List<DietPlan>>? _plansFuture;
   DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialIndex;
     _reloadData();
+    _loadPlans();
   }
 
-  void _reloadData() async {
+  // Função para recarregar os dados do Dashboard
+  void _reloadData({DateTime? newDate}) async {
+    if (newDate != null) {
+      setState(() {
+        _selectedDate = newDate;
+      });
+    }
     final token = await _storage.read(key: 'auth_token');
     if (token == null) return;
     setState(() {
@@ -41,27 +54,33 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _onDateSelected(DateTime newDate) {
+  // Função para recarregar a lista de Planos
+  void _loadPlans() async {
+    final token = await _storage.read(key: 'auth_token');
+    if (token == null) return;
     setState(() {
-      _selectedDate = newDate;
-      _reloadData();
+      _plansFuture = _apiService.getDietPlans(token);
     });
+  }
+
+  // Função central para quando um plano é alterado
+  void _onDietPlanChanged() {
+    _reloadData(); // Recarrega o Dashboard
+    _loadPlans(); // Recarrega a lista de planos
+    // Se o usuário não estiver no Dashboard, o leva para lá
+    if (_selectedIndex != 0) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+    }
   }
 
   void _onItemTapped(int index) {
-    // Se o usuário clicar na aba "Resumo", recarrega os dados
-    if (index == 0) {
-      _reloadData();
-    }
+    if (index == 0) _reloadData(); // Sempre recarrega o dashboard ao entrar
+    if (index == 1) _loadPlans(); // Sempre recarrega os planos ao entrar
     setState(() {
       _selectedIndex = index;
     });
-  }
-
-  void _onDietActivated() {
-    // Apenas recarrega os dados do dashboard em segundo plano para quando o usuário voltar lá.
-    // A linha que mudava de aba foi removida.
-    _reloadData();
   }
 
   @override
@@ -70,23 +89,21 @@ class _MainScreenState extends State<MainScreen> {
 
     final List<Widget> widgetOptions = <Widget>[
       DashboardScreen(
+        key: ValueKey(
+            _dashboardDataFuture), // Garante a reconstrução ao mudar a data
+        selectedDate: _selectedDate,
+        onPlanCreated: _loadPlans,
         dashboardDataFuture: _dashboardDataFuture,
         onRefresh: _reloadData,
-        onSelectDate: (date) async {
-          final DateTime? picked = await showDatePicker(
-            context: context,
-            initialDate: date,
-            firstDate: DateTime(2020),
-            lastDate: DateTime.now(),
-            locale: const Locale('pt', 'BR'),
-          );
-          if (picked != null) {
-            _onDateSelected(picked);
-          }
-        },
-        selectedDate: _selectedDate,
+        onDateSelected: (date) => _reloadData(newDate: date),
       ),
-      MealPlanScreen(onDietActivated: _onDietActivated),
+      MealPlanScreen(
+        key: ValueKey(
+            _dashboardDataFuture), // Garante a reconstrução ao mudar a data
+        plansFuture: _plansFuture,
+        onRefresh: _loadPlans,
+        onDietPlanChanged: _onDietPlanChanged,
+      ),
       const ReportsScreen(),
       const ProfileScreen(),
     ];
@@ -120,21 +137,13 @@ class _MainScreenState extends State<MainScreen> {
               unselectedItemColor: theme.unselectedWidgetColor,
               items: const <BottomNavigationBarItem>[
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.home_filled),
-                  label: 'Resumo',
-                ),
+                    icon: Icon(Icons.home_filled), label: 'Resumo'),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.restaurant_menu),
-                  label: 'Plano',
-                ),
+                    icon: Icon(Icons.restaurant_menu), label: 'Plano'),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.bar_chart),
-                  label: 'Relatórios',
-                ),
+                    icon: Icon(Icons.bar_chart), label: 'Relatórios'),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.person_outline),
-                  label: 'Perfil',
-                ),
+                    icon: Icon(Icons.person_outline), label: 'Perfil'),
               ],
               currentIndex: _selectedIndex,
               onTap: _onItemTapped,

@@ -1,15 +1,16 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // 1. Importa o Firebase Messaging
+import 'package:provider/provider.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 import '../api/api_service.dart';
-import 'main_screen.dart';
+//import 'main_screen.dart';
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
-import 'package:provider/provider.dart';
-//import '../widgets/gradient_scaffold.dart';
-import 'register_screen.dart';
 import 'forgot_password_screen.dart';
+import 'register_screen.dart';
+import 'onboarding_check_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,24 +31,20 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).unfocus();
 
     if (_formKey.currentState?.validate() ?? false) {
-      setState(() {
-        _isLoading = true;
-      });
-
+      setState(() => _isLoading = true);
       try {
         final authToken = await _apiService.login(
           _emailController.text,
           _passwordController.text,
         );
-
         await _storage.write(key: 'auth_token', value: authToken);
 
-        // ***** LÓGICA DE NOTIFICAÇÃO ADICIONADA AQUI *****
         await _setupNotifications(authToken);
 
         if (mounted) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const MainScreen()),
+            MaterialPageRoute(
+                builder: (context) => const OnboardingCheckScreen()),
           );
         }
       } catch (e) {
@@ -61,32 +58,19 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
-  // 2. Novo método para configurar as notificações
   Future<void> _setupNotifications(String authToken) async {
-    // Pede permissão ao usuário
     final messaging = FirebaseMessaging.instance;
     await messaging.requestPermission();
-
-    // Pega o token FCM do dispositivo
     final fcmToken = await messaging.getToken();
-
     if (fcmToken != null) {
-      print(
-          '<<<<< FCM Token: $fcmToken >>>>>'); // Para vermos o token no console
       try {
-        // Envia o token para o nosso backend
         await _apiService.sendDeviceToken(authToken, fcmToken);
       } catch (e) {
-        // Se falhar, apenas mostra um erro no console, não impede o login
         print('Falha ao enviar token FCM para o backend: $e');
       }
     }
@@ -103,7 +87,6 @@ class _LoginScreenState extends State<LoginScreen> {
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
-            //title: const Text('Dieta+ App'),
             centerTitle: true,
           ),
           body: Center(
@@ -116,12 +99,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: <Widget>[
                     Image.asset(
                       'assets/logo_completa.png',
-                      height: 150, // Ajuste a altura como preferir
+                      height: 150,
                     ),
-                    const SizedBox(height: 48.0), // Espaçamento
+                    const SizedBox(height: 48.0),
                     TextFormField(
                       controller: _emailController,
                       decoration: const InputDecoration(
+                        // <-- 'const' adicionado
                         labelText: 'Email',
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
@@ -139,6 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _passwordController,
                       decoration: const InputDecoration(
+                        // <-- 'const' adicionado
                         labelText: 'Senha',
                         prefixIcon: Icon(Icons.lock_outline),
                       ),
@@ -192,40 +177,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16.0),
                     TextButton(
                       onPressed: () {
-                        // NAVEGA PARA A TELA DE ESQUECI A SENHA
                         Navigator.of(context).push(
                           MaterialPageRoute(
                               builder: (context) =>
                                   const ForgotPasswordScreen()),
                         );
                       },
-                      child: Text(
-                        'Esqueci minha senha?',
-                        style:
-                            TextStyle(color: theme.textTheme.bodySmall?.color),
-                      ),
+                      child: const Text('Esqueci minha senha?'),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Não tem uma conta?',
-                          style: TextStyle(
-                              color: theme.textTheme.bodySmall?.color),
-                        ),
+                        const Text('Não tem uma conta?'),
                         TextButton(
                           onPressed: () {
-                            // Navega para a tela de registro
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                   builder: (context) => const RegisterScreen()),
                             );
                           },
-                          child: const Text(
+                          child: Text(
                             'Cadastre-se',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Color.fromARGB(255, 242, 196, 245),
+                              color: theme.primaryColor,
                             ),
                           ),
                         ),

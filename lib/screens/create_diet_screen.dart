@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
 import '../api/api_service.dart';
+//import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
+import 'dart:ui';
 
 // Classes de modelo para ajudar a gerenciar o estado do formulário
 class FoodEntry {
@@ -11,9 +12,9 @@ class FoodEntry {
 }
 
 class MealEntry {
-  TextEditingController nameController = TextEditingController();
+  String? selectedMealName;
   TextEditingController timeController = TextEditingController();
-  List<FoodEntry> foods = [FoodEntry()]; // Começa com um campo de alimento
+  List<FoodEntry> foods = [FoodEntry()];
 }
 
 class CreateDietScreen extends StatefulWidget {
@@ -37,18 +38,27 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
   final _fatsController = TextEditingController();
   final _hydrationController = TextEditingController();
 
-  // Lista dinâmica de refeições
+  // Lista de refeições pré-definidas para o usuário escolher
+  final List<String> _predefinedMeals = [
+    'Café da Manhã',
+    'Lanche da Manhã',
+    'Almoço',
+    'Lanche da Tarde',
+    'Jantar',
+    'Ceia',
+  ];
+
   List<MealEntry> _meals = [MealEntry()]; // Começa com uma refeição
+
   @override
   void dispose() {
-    _planNameController.dispose(); // Limpa o novo controller
+    _planNameController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
     _carbsController.dispose();
     _fatsController.dispose();
     _hydrationController.dispose();
     for (var meal in _meals) {
-      meal.nameController.dispose();
       meal.timeController.dispose();
       for (var food in meal.foods) {
         food.nameController.dispose();
@@ -64,62 +74,75 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
     });
   }
 
+  void _removeMeal(int index) {
+    setState(() {
+      _meals.removeAt(index);
+    });
+  }
+
   void _addFoodToMeal(int mealIndex) {
     setState(() {
       _meals[mealIndex].foods.add(FoodEntry());
     });
   }
 
+  void _removeFoodFromMeal(int mealIndex, int foodIndex) {
+    setState(() {
+      _meals[mealIndex].foods.removeAt(foodIndex);
+    });
+  }
+
   Future<void> _saveDietPlan() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      setState(() => _isLoading = true);
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-      // Constrói o objeto JSON a partir dos controllers
-      final dietData = {
-        'name': _planNameController.text,
-        'target_calories': int.tryParse(_caloriesController.text) ?? 0,
-        'target_protein': int.tryParse(_proteinController.text) ?? 0,
-        'target_carbs': int.tryParse(_carbsController.text) ?? 0,
-        'target_fats': int.tryParse(_fatsController.text) ?? 0,
-        'hydration_goal_ml': int.tryParse(_hydrationController.text) ?? 0,
-        'meals': _meals
-            .map((meal) => {
-                  'name': meal.nameController.text,
-                  'time': meal.timeController.text,
-                  'foods': meal.foods
-                      .map((food) => {
-                            'name': food.nameController.text,
-                            'quantity': food.quantityController.text,
-                          })
-                      .toList(),
-                })
-            .toList(),
-      };
+    setState(() => _isLoading = true);
 
-      try {
-        final token = await _storage.read(key: 'auth_token');
-        if (token == null) throw Exception('Token não encontrado');
+    // Constrói o objeto JSON a partir dos controllers
+    final dietData = {
+      'name': _planNameController.text,
+      'target_calories': int.tryParse(_caloriesController.text) ?? 0,
+      'target_protein': int.tryParse(_proteinController.text) ?? 0,
+      'target_carbs': int.tryParse(_carbsController.text) ?? 0,
+      'target_fats': int.tryParse(_fatsController.text) ?? 0,
+      'hydration_goal_ml': int.tryParse(_hydrationController.text) ?? 0,
+      'meals': _meals
+          .where((meal) => meal.selectedMealName != null)
+          .map((meal) => {
+                'name': meal.selectedMealName,
+                'time': meal.timeController.text,
+                'foods': meal.foods
+                    .where((food) => food.nameController.text.isNotEmpty)
+                    .map((food) => {
+                          'name': food.nameController.text,
+                          'quantity': food.quantityController.text,
+                        })
+                    .toList(),
+              })
+          .toList(),
+    };
 
-        await _apiService.createManualDiet(token, dietData);
+    try {
+      final token = await _storage.read(key: 'auth_token');
+      if (token == null) throw Exception('Token não encontrado');
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Plano criado com sucesso!'),
-                backgroundColor: Colors.green),
-          );
-          Navigator.of(context)
-              .pop(true); // Retorna 'true' para indicar sucesso
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+      await _apiService.createManualDiet(token, dietData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Plano criado com sucesso!'),
+              backgroundColor: Colors.green),
+        );
+        Navigator.of(context).pop(true); // Retorna 'true' para indicar sucesso
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -139,7 +162,7 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            _buildSectionTitle('Metas Diárias'),
+            _buildSectionTitle('Informações do Plano'),
             TextFormField(
               controller: _planNameController,
               decoration: const InputDecoration(
@@ -149,6 +172,7 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
                   : null,
             ),
             const SizedBox(height: 16),
+            _buildSectionTitle('Metas Diárias'),
             TextFormField(
                 controller: _caloriesController,
                 decoration: const InputDecoration(labelText: 'Calorias (kcal)'),
@@ -192,22 +216,51 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
       MealEntry meal = entry.value;
 
       return Card(
+        color: Colors.white.withOpacity(0.1),
         margin: const EdgeInsets.symmetric(vertical: 8),
         child: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextFormField(
-                  controller: meal.nameController,
-                  decoration: const InputDecoration(
-                      labelText: 'Nome da Refeição (ex: Café da Manhã)')),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: meal.selectedMealName,
+                      hint: const Text('Selecione a Refeição'),
+                      items: _predefinedMeals.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          meal.selectedMealName = newValue;
+                        });
+                      },
+                      validator: (v) =>
+                          v == null ? 'Selecione uma refeição' : null,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent),
+                    onPressed: () => _removeMeal(mealIndex),
+                  ),
+                ],
+              ),
               TextFormField(
                   controller: meal.timeController,
                   decoration:
                       const InputDecoration(labelText: 'Horário (ex: 08:00)')),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
+              const Text('Alimentos:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               ...meal.foods.asMap().entries.map((foodEntry) {
-                //int foodIndex = foodEntry.key;
+                int foodIndex = foodEntry.key;
                 FoodEntry food = foodEntry.value;
                 return Row(
                   children: [
@@ -222,12 +275,21 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
                             controller: food.quantityController,
                             decoration: const InputDecoration(
                                 labelText: 'Quantidade'))),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, size: 20),
+                      onPressed: () =>
+                          _removeFoodFromMeal(mealIndex, foodIndex),
+                    ),
                   ],
                 );
               }).toList(),
-              TextButton(
-                  onPressed: () => _addFoodToMeal(mealIndex),
-                  child: const Text('Adicionar Alimento')),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                    onPressed: () => _addFoodToMeal(mealIndex),
+                    child: const Text('Adicionar Alimento')),
+              ),
             ],
           ),
         ),
@@ -236,13 +298,14 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Text(title,
           style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).primaryColor)),
+              color: theme.primaryColor)),
     );
   }
 }

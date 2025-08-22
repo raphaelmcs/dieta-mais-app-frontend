@@ -1,10 +1,12 @@
-import 'package:dieta_mais_app/providers/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
+
+//import 'onboarding_check_screen.dart';
 import 'dart:ui';
 import 'login_screen.dart';
-import 'main_screen.dart'; // <-- MUDANÇA: Importa a nova tela principal
-import 'package:provider/provider.dart'; // Importa o provider
+import 'main_screen.dart'; // O destino principal
 import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -22,15 +24,19 @@ class _SplashScreenState extends State<SplashScreen> {
     _checkAuthStatus();
   }
 
+  // Lógica simplificada: se tem token, vai para MainScreen. Senão, vai para Login.
   Future<void> _checkAuthStatus() async {
     final token = await _storage.read(key: 'auth_token');
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
+
     if (token != null) {
+      // Se está logado, vai direto para a tela boas vindas
       Navigator.of(context).pushReplacement(
-          // ***** MUDANÇA AQUI *****
-          MaterialPageRoute(builder: (context) => const MainScreen()));
+        MaterialPageRoute(builder: (context) => const MainScreen()),
+      );
     } else {
+      // Se não está logado, vai para a tela de login
       Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const LoginScreen()));
     }

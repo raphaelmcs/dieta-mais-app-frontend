@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../api/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
@@ -22,6 +23,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _passwordConfirmationController = TextEditingController();
 
+  String? _fullPhoneNumber;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -33,44 +36,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _performRegister() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      setState(() => _isLoading = true);
+    // Valida o formulário antes de continuar
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-      try {
-        await _apiService.register(
-          name: _nameController.text,
-          email: _emailController.text,
-          phoneNumber: _phoneController.text,
-          password: _passwordController.text,
-          passwordConfirmation: _passwordConfirmationController.text,
+    setState(() => _isLoading = true);
+
+    try {
+      await _apiService.register(
+        name: _nameController.text,
+        email: _emailController.text,
+        phoneNumber: _fullPhoneNumber, // 3. Passa o número completo para a API
+        password: _passwordController.text,
+        passwordConfirmation: _passwordConfirmationController.text,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Usuário registrado com sucesso! Por favor, faça o login.'),
+            backgroundColor: Colors.green,
+          ),
         );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                  'Usuário registrado com sucesso! Por favor, faça o login.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          // Retorna para a tela anterior (Login)
-          Navigator.of(context).pop();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text('Erro: ${e.toString().replaceAll("Exception: ", "")}'),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+        Navigator.of(context).pop();
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Erro: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -100,11 +101,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       (v == null || !v.contains('@')) ? 'Email inválido' : null,
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _phoneController,
+                IntlPhoneField(
                   decoration: const InputDecoration(
-                      labelText: 'Telefone (Opcional, ex: +55119... )'),
-                  keyboardType: TextInputType.phone,
+                    labelText: 'Telefone',
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(),
+                    ),
+                  ),
+                  initialCountryCode: 'BR', // Define o Brasil como padrão
+                  languageCode: 'pt_BR', // Deixa a lista de países em português
+                  onChanged: (phone) {
+                    // Guarda o número completo (ex: +5511987654321) na nossa variável
+                    _fullPhoneNumber = phone.completeNumber;
+                  },
                 ),
                 TextFormField(
                   controller: _passwordController,

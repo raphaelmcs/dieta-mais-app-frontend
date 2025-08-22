@@ -17,9 +17,8 @@ Future<void> main() async {
   );
   await FirebaseApi().initNotifications();
 
-  Animate.restartOnHotReload = true; // Opcional, mas ótimo para desenvolvimento
+  Animate.restartOnHotReload = true;
   runApp(
-    // 1. O Provider agora "envolve" o nosso aplicativo
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
       child: const MyApp(),
@@ -32,12 +31,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 2. O MyApp agora consegue encontrar o Provider, pois está "dentro" dele
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
       title: 'Dieta+ App',
-      // O tema agora é dinâmico, vindo do Provider
       theme: themeProvider.currentTheme.themeData,
 
       localizationsDelegates: const [
@@ -49,7 +46,8 @@ class MyApp extends StatelessWidget {
         Locale('pt', 'BR'),
       ],
 
-      home: const SplashScreen(),
+      // ***** ALTERAÇÃO AQUI *****
+      home: const SplashScreen(), // Adicionado 'const'
     );
   }
 }

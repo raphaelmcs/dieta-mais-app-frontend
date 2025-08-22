@@ -17,27 +17,30 @@ class HydrationData {
 }
 
 class DailySummary {
-  final int dietId;
+  final bool hasActiveDiet; // <-- NOVO
+  final int? dietId; // <-- AGORA É NULÁVEL
   final AverageData targets;
   final AverageData consumed;
   final AverageData remaining;
-  final HydrationData hydration; // <-- ADICIONE
+  final HydrationData hydration;
 
   DailySummary({
-    required this.dietId,
+    required this.hasActiveDiet, // <-- NOVO
+    this.dietId, // <-- AGORA É NULÁVEL
     required this.targets,
     required this.consumed,
     required this.remaining,
-    required this.hydration, // <-- ADICIONE
+    required this.hydration,
   });
 
   factory DailySummary.fromJson(Map<String, dynamic> json) {
     return DailySummary(
-      dietId: json['diet_id'],
+      hasActiveDiet: json['has_active_diet'] ?? false, // <-- NOVO
+      dietId: json['diet_id'], // <-- AGORA É NULÁVEL
       targets: AverageData.fromJson(json['targets']),
       consumed: AverageData.fromJson(json['consumed']),
       remaining: AverageData.fromJson(json['remaining']),
-      hydration: HydrationData.fromJson(json['hydration']), // <-- ADICIONE
+      hydration: HydrationData.fromJson(json['hydration']),
     );
   }
 }

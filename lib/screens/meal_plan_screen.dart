@@ -1,28 +1,38 @@
 import 'dart:io';
 import 'dart:ui';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../api/api_service.dart';
 import '../models/diet_plan.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
-import '../widgets/glassmorphic_container.dart';
 import '../widgets/gradient_scaffold.dart';
+import '../widgets/glassmorphic_container.dart';
 import 'create_diet_screen.dart';
 import 'diet_plan_detail_screen.dart';
 
 class MealPlanScreen extends StatefulWidget {
-  final VoidCallback onDietActivated;
-  const MealPlanScreen({super.key, required this.onDietActivated});
+  final Future<List<DietPlan>>? plansFuture;
+  final VoidCallback onRefresh;
+  final VoidCallback onDietPlanChanged;
+
+  const MealPlanScreen({
+    super.key,
+    required this.plansFuture,
+    required this.onRefresh,
+    required this.onDietPlanChanged,
+  });
 
   @override
   State<MealPlanScreen> createState() => _MealPlanScreenState();
 }
 
 class _MealPlanScreenState extends State<MealPlanScreen> {
+  // As variáveis agora estão aqui, no lugar certo
   final _apiService = ApiService();
   final _storage = const FlutterSecureStorage();
   Future<List<DietPlan>>? _plansFuture;
@@ -34,27 +44,32 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     _loadPlans();
   }
 
-  // A função agora é async
   void _loadPlans() async {
     final token = await _storage.read(key: 'auth_token');
     if (token == null) return;
+    if (!mounted) return; // <-- proteção
     setState(() {
-      _plansFuture = _apiService.getAllDietPlans(token);
+      _plansFuture = _apiService.getDietPlans(token);
     });
   }
 
+  // O método de upload agora funciona, pois tem acesso às variáveis
   Future<void> _pickAndUploadPdf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
     );
+
     if (result != null && result.files.single.path != null) {
+      if (!mounted) return;
       setState(() => _isUploading = true);
       final file = File(result.files.single.path!);
       try {
         final token = await _storage.read(key: 'auth_token');
         if (token == null) throw Exception('Token não encontrado.');
+
         await _apiService.uploadDietPdf(token, file);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -114,7 +129,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                           builder: (context) => const CreateDietScreen()),
                     );
                     if (result == true) {
-                      _loadPlans();
+                      widget.onDietPlanChanged(); // <-- CHAMA A FUNÇÃO CENTRAL
                     }
                   },
                 ),
@@ -140,7 +155,6 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         backgroundColor: theme.primaryColor,
         child: Icon(Icons.add, color: theme.colorScheme.onPrimary),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: FutureBuilder<List<DietPlan>>(
         future: _plansFuture,
         builder: (context, snapshot) {
@@ -169,39 +183,56 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                           ? const Icon(Icons.check_circle, color: Colors.green)
                           : const Icon(Icons.radio_button_unchecked),
                       trailing: PopupMenuButton<String>(
-                        // Define o tipo como String
-                        onSelected: (String value) async {
+                        onSelected: (value) async {
                           final token = await _storage.read(key: 'auth_token');
                           if (token == null) return;
 
-                          if (value == 'view') {
-                            // NAVEGAÇÃO PARA A TELA DE DETALHES
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    DietPlanDetailScreen(dietPlanId: plan.id),
-                              ),
+                          try {
+                            if (value == 'view') {
+                              if (!mounted) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      DietPlanDetailScreen(dietPlanId: plan.id),
+                                ),
+                              );
+                              return;
+                            }
+
+                            if (value == 'activate') {
+                              await _apiService.setActiveDiet(token, plan.id);
+                              if (!mounted) return;
+                              // Recarrega a lista local para refletir o novo ativo
+                              _loadPlans();
+                              // Notifica o dashboard para atualizar os gráficos
+                              widget.onDietPlanChanged();
+                              return;
+                            }
+
+                            if (value == 'delete') {
+                              await _apiService.deleteDiet(token, plan.id);
+                              if (!mounted) return;
+                              _loadPlans();
+                              widget.onDietPlanChanged();
+                              return;
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Erro: $e'),
+                                  backgroundColor: Colors.redAccent),
                             );
-                          } else if (value == 'activate') {
-                            await _apiService.setActiveDiet(token, plan.id);
-                            widget.onDietActivated();
-                            _loadPlans();
-                          } else if (value == 'delete') {
-                            await _apiService.deleteDiet(token, plan.id);
-                            _loadPlans();
                           }
                         },
                         itemBuilder: (BuildContext context) =>
                             <PopupMenuEntry<String>>[
                           const PopupMenuItem<String>(
-                            value: 'view',
-                            child: Text('Visualizar'),
-                          ),
+                              value: 'view', child: Text('Visualizar')),
                           if (!plan.isActive)
                             const PopupMenuItem<String>(
-                              value: 'activate',
-                              child: Text('Definir como Ativo'),
-                            ),
+                                value: 'activate',
+                                child: Text('Definir como Ativo')),
                           const PopupMenuItem<String>(
                             value: 'delete',
                             child: Text('Excluir',

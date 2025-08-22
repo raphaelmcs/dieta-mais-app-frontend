@@ -66,39 +66,44 @@ class _WeeklyReportViewState extends State<WeeklyReportView> {
                   color: AppThemes.glassColor.withOpacity(0.3),
                 ),
               ),
-              child: Theme(
-                data: Theme.of(context), // Usa o tema ativo
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height: 300,
-                      child: CalendarDatePicker(
-                        initialDate: _selectedWeek,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                        onDateChanged: (DateTime date) {
-                          tempSelectedDate = date;
-                        },
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          child: const Text('CANCELAR'),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          child: const Text('OK'),
-                          onPressed: () {
-                            Navigator.of(context).pop(tempSelectedDate);
+              // ***** A CORREÇÃO ESTÁ AQUI *****
+              // Damos um tamanho fixo e seguro ao conteúdo do diálogo
+              child: SizedBox(
+                width: 300,
+                height: 420,
+                child: Theme(
+                  data: Theme.of(context),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Expanded(
+                        child: CalendarDatePicker(
+                          initialDate: _selectedWeek,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                          onDateChanged: (DateTime date) {
+                            tempSelectedDate = date;
                           },
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            child: const Text('CANCELAR'),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            child: const Text('OK'),
+                            onPressed: () {
+                              Navigator.of(context).pop(tempSelectedDate);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

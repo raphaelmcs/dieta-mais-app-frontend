@@ -157,8 +157,8 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
                       GlassmorphicContainer(
                           child: _buildTopFoodsList(report.topFoods)),
                       const SizedBox(height: 24),
-                      _buildSectionTitle('Análise Dieta+'),
-/*                       GlassmorphicContainer(
+/*                       _buildSectionTitle('Análise Dieta+'),
+                      GlassmorphicContainer(
                           child: _buildAiAnalysis(report.aiAnalysis)), */
                     ],
                   ),

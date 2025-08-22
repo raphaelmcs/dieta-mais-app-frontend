@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../api/api_service.dart';
 import '../models/food_suggestion.dart';
-import '../theme/app_theme.dart';
+//import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
 import '../widgets/glassmorphic_container.dart'; // Importa nosso container de vidro
 

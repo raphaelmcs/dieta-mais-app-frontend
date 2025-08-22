@@ -1,6 +1,6 @@
 import 'package:dieta_mais_app/models/meal.dart';
 
-import 'diet_plan.dart'; // Reutilizaremos o modelo Meal
+//import 'diet_plan.dart'; // Reutilizaremos o modelo Meal
 
 class RecalculatedDiet {
   final String analysis;
