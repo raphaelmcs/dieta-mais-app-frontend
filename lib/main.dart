@@ -15,7 +15,9 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  await FirebaseApi().initNotifications();
+  final firebaseApi = FirebaseApi();
+  await firebaseApi.initNotifications();
+  await firebaseApi.scheduleRemindersFromPreferences();
 
   Animate.restartOnHotReload = true;
   runApp(

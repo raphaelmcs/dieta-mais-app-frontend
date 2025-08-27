@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
 import 'package:dieta_mais_app/widgets/glass_dialog.dart';
 import 'login_screen.dart';
+import 'reminder_settings_screen.dart';
 
 class ProfileData {
   final User user;
@@ -280,6 +281,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onChanged: (bool value) =>
                         _updateSetting('wants_meal_reminders', value, settings),
                     activeColor: theme.textTheme.bodySmall?.color),
+                ListTile(
+                  leading: const Icon(Icons.alarm),
+                  title: const Text('Configurar horários'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (context) => const ReminderSettingsScreen()),
+                    );
+                  },
+                ),
                 const SizedBox(height: 24),
                 _buildSectionTitle('Aparência'),
 // ListTile para abrir o seletor de tema

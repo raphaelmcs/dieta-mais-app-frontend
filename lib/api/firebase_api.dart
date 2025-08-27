@@ -1,5 +1,9 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 // Esta função lida com mensagens quando o app está em segundo plano ou fechado.
 // Ela precisa ficar fora de uma classe.
@@ -23,6 +27,9 @@ class FirebaseApi {
 
     // Configuração inicial para as notificações locais
     await _initLocalNotifications();
+
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('America/Sao_Paulo'));
 
     // Configura os listeners para quando as notificações chegam
     _initPushNotifications();
@@ -75,5 +82,80 @@ class FirebaseApi {
 
     // Lida com notificações que chegam enquanto o app está ABERTO (em primeiro plano)
     FirebaseMessaging.onMessage.listen(_handleMessage);
+  }
+
+  Future<void> scheduleRemindersFromPreferences() async {
+    const storage = FlutterSecureStorage();
+    final breakfast = await storage.read(key: 'breakfast_time');
+    final lunch = await storage.read(key: 'lunch_time');
+    final dinner = await storage.read(key: 'dinner_time');
+    final intervalStr = await storage.read(key: 'hydration_interval');
+
+    await _localNotifications.cancelAll();
+
+    final times = <TimeOfDay>[];
+    if (breakfast != null) times.add(_parseTime(breakfast));
+    if (lunch != null) times.add(_parseTime(lunch));
+    if (dinner != null) times.add(_parseTime(dinner));
+    if (times.isNotEmpty) {
+      await _scheduleMealNotifications(times);
+    }
+
+    final interval = int.tryParse(intervalStr ?? '');
+    if (interval != null && interval > 0) {
+      await _scheduleHydration(interval);
+    }
+  }
+
+  TimeOfDay _parseTime(String value) {
+    final parts = value.split(':');
+    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+  }
+
+  Future<void> _scheduleMealNotifications(List<TimeOfDay> times) async {
+    var id = 0;
+    for (final t in times) {
+      final scheduled = _nextInstanceOfTime(t);
+      await _localNotifications.zonedSchedule(
+        id++,
+        'Hora da refeição',
+        'Está na hora da sua refeição!',
+        scheduled,
+        _notificationDetails(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    }
+  }
+
+  Future<void> _scheduleHydration(int intervalMinutes) async {
+    var next = tz.TZDateTime.now(tz.local).add(Duration(minutes: intervalMinutes));
+    var id = 100;
+    final end = next.add(const Duration(hours: 24));
+    while (next.isBefore(end)) {
+      await _localNotifications.zonedSchedule(
+        id++,
+        'Hora de beber água',
+        'Mantenha-se hidratado!',
+        next,
+        _notificationDetails(),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      next = next.add(Duration(minutes: intervalMinutes));
+    }
+  }
+
+  tz.TZDateTime _nextInstanceOfTime(TimeOfDay time) {
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+        tz.local, now.year, now.month, now.day, time.hour, time.minute);
+    if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    return scheduled;
   }
 }
