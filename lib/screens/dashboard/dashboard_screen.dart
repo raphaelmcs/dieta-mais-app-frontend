@@ -11,6 +11,9 @@ import 'widgets/charts_pageview.dart';
 import 'widgets/hydration_card.dart';
 import 'widgets/meal_list_view.dart';
 
+import '../../widgets/glass_dialog.dart'; // onde está o showGlassDialog
+import '../../widgets/glassmorphic_container.dart'; // já usado pelo helper
+
 import '../login_screen.dart';
 import '../../api/api_service.dart';
 import '../../models/dashboard_data.dart';
@@ -133,79 +136,107 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    DateTime? tempSelectedDate = _selectedDate;
+  DateTime tempSelectedDate = _selectedDate;
 
-    final DateTime? picked = await showDialog<DateTime>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: Colors.transparent,
-          contentPadding: EdgeInsets.zero,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-          content: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppThemes.glassColor.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  width: 1.5,
-                  color: AppThemes.glassColor.withOpacity(0.3),
-                ),
-              ),
-              // ***** A CORREÇÃO ESTÁ AQUI *****
-              // Damos um tamanho fixo e seguro ao conteúdo do diálogo
-              child: SizedBox(
-                width: 300,
-                height: 420,
-                child: Theme(
-                  data: Theme.of(context),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Expanded(
-                        child: CalendarDatePicker(
-                          initialDate: _selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
-                          onDateChanged: (DateTime date) {
-                            tempSelectedDate = date;
-                          },
-                        ),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            child: const Text('CANCELAR'),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            child: const Text('OK'),
-                            onPressed: () {
-                              Navigator.of(context).pop(tempSelectedDate);
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+  final picked = await showGlassDialog<DateTime>(
+    context: context,
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Selecionar data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: 320,
+            height: 380,
+            child: CalendarDatePicker(
+              initialDate: _selectedDate,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+              onDateChanged: (date) => tempSelectedDate = date,
             ),
           ),
-        );
-      },
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(tempSelectedDate),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+
+  if (picked != null && picked != _selectedDate) {
+    setState(() {
+      _selectedDate = picked;
+      _dashboardDataFuture = _loadDashboardData(picked);
+    });
+  }
+}
+
+void _handleAddWater(DailySummary summary) async {
+  // Se não tem plano ativo e a meta é 0, peça para definir a meta primeiro (uma única vez)
+  if ((summary.hasActiveDiet == false) && (summary.hydration.goal == 0)) {
+    final shouldSetGoal = await showGlassDialog<bool>(
+      context: context,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Definir meta de hidratação',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Você ainda não tem um plano ativo. '
+              'Para acompanhar seu progresso de água, defina uma meta diária (em ml).',
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  child: const Text('Depois'),
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  child: const Text('Definir agora'),
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
 
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _dashboardDataFuture = _loadDashboardData(picked);
-      });
+    if (shouldSetGoal == true) {
+      // Abre o diálogo de meta já existente
+      _showUpdateGoalDialog(2000); // sugestão inicial de 2000 ml
+      return;
     }
+    // Mesmo que escolha "Depois", ainda pode registrar água
+    _showAddWaterDialog();
+    return;
   }
+
+  // Caso normal
+  _showAddWaterDialog();
+}
 
 // A lógica de Recálculo agora recebe os dados necessários como parâmetros
   Future<void> _handleOffPlanMeal(DailySummary summary) async {
@@ -274,7 +305,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Aguarde, a IA está recalculando seu dia...')),
+            content: Text('Aguarde, o Dieta+ está recalculando seu dia...')),
       );
 
       final result = await _apiService.recalculateDiet(token);
@@ -392,67 +423,66 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // ***** 3. MÉTODO PARA O DIÁLOGO DE ADICIONAR ÁGUA RESTAURADO *****
   void _showAddWaterDialog() {
-    final amountController = TextEditingController();
-    // Formata a data selecionada para um formato legível
-    final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: AlertDialog(
-            backgroundColor: const Color(0xFF2c2c2e).withOpacity(0.95),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.0)),
-            // Título do diálogo agora inclui a data
-            title: RichText(
-              textAlign: TextAlign.center,
-              text: TextSpan(
-                style: Theme.of(context).textTheme.titleLarge,
-                children: <TextSpan>[
-                  const TextSpan(text: 'Adicionar Água\n'),
-                  TextSpan(
-                    text: 'em $formattedDate',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.normal,
-                      color: Theme.of(context).unselectedWidgetColor,
-                    ),
+  final amountController = TextEditingController();
+  final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
+
+  showGlassDialog<void>(
+    context: context,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: Theme.of(context).textTheme.titleLarge,
+              children: <TextSpan>[
+                const TextSpan(text: 'Adicionar Água\n'),
+                TextSpan(
+                  text: 'em $formattedDate',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.normal,
+                    color: Theme.of(context).unselectedWidgetColor,
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: amountController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Quantidade em ml'),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
               ),
-            ),
-            content: TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Quantidade em ml'),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () =>
-                      Navigator.of(context).pop(), // Usa o context do dialog
-                  child: const Text('Cancelar')),
-              TextButton(
+              const SizedBox(width: 8),
+              ElevatedButton(
                 onPressed: () async {
                   final amount = int.tryParse(amountController.text);
                   if (amount != null && amount > 0) {
-                    // Fecha o diálogo ANTES de fazer a chamada de API
-                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // fecha o dialog antes da chamada
                     try {
                       final token = await _storage.read(key: 'auth_token');
                       if (token == null) return;
                       await _apiService.addHydrationLog(
                         token: token,
                         amount: amount,
-                        consumedAt: _selectedDate, // <-- PASSA A DATA
+                        consumedAt: _selectedDate,
                       );
-                      _reloadData(); // Recarrega os dados
+                      _reloadData();
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Erro: $e'),
-                              backgroundColor: Colors.red),
+                          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
                         );
                       }
                     }
@@ -462,30 +492,39 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ],
+      ),
+    ),
+  );
+}
 
   void _showUpdateGoalDialog(int currentGoal) {
-    final goalController = TextEditingController(text: currentGoal.toString());
-    showDialog(
-      context: context,
-      builder: (context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: AlertDialog(
-            title: const Text('Alterar Meta de Hidratação'),
-            content: TextField(
-              controller: goalController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Nova meta em ml'),
-            ),
-            actions: [
+  final goalController = TextEditingController(text: currentGoal.toString());
+
+  showGlassDialog<void>(
+    context: context,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Alterar Meta de Hidratação', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: goalController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Nova meta em ml'),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
               TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar')),
-              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
                 onPressed: () async {
                   final goal = int.tryParse(goalController.text);
                   if (goal != null && goal > 0) {
@@ -493,14 +532,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                       final token = await _storage.read(key: 'auth_token');
                       if (token == null) return;
                       await _apiService.updateHydrationGoal(token, goal);
-                      Navigator.of(context).pop();
+                      if (mounted) Navigator.of(context).pop();
                       _reloadData();
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Erro ao salvar: $e'),
-                              backgroundColor: Colors.red),
+                          SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red),
                         );
                       }
                     }
@@ -510,10 +547,12 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ],
+      ),
+    ),
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -573,14 +612,16 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Column(
                   children: [
                     // 1. CHAMA O WIDGET DO CARD DE HIDRATAÇÃO
-                    HydrationCard(
-                      hydration: summary.hydration,
-                      onAddWater: _showAddWaterDialog,
-                      onUpdateGoal: () =>
-                          _showUpdateGoalDialog(summary.hydration.goal),
-                      gradient: _getHydrationGradient(
-                          summary.hydration.consumed / summary.hydration.goal),
-                    ),
+                                HydrationCard(
+              hydration: summary.hydration,
+              onAddWater: () => _handleAddWater(summary),  // <--- aqui
+              onUpdateGoal: () => _showUpdateGoalDialog(summary.hydration.goal),
+              gradient: _getHydrationGradient(
+                (summary.hydration.goal > 0)
+                  ? (summary.hydration.consumed / summary.hydration.goal)
+                  : 0.0,
+              ),
+            ),
                     const SizedBox(height: 24),
                     // 2. CHAMA O WIDGET DO CARROSSEL DE GRÁFICOS
                     ChartsPageView(

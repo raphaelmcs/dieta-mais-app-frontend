@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../api/api_service.dart';
 //import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
+import '../widgets/glassmorphic_container.dart';
 import 'dart:ui';
 
 // Classes de modelo para ajudar a gerenciar o estado do formulário
@@ -215,85 +216,85 @@ class _CreateDietScreenState extends State<CreateDietScreen> {
       int mealIndex = entry.key;
       MealEntry meal = entry.value;
 
-      return Card(
-        color: Colors.white.withOpacity(0.1),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: meal.selectedMealName,
-                      hint: const Text('Selecione a Refeição'),
-                      items: _predefinedMeals.map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          meal.selectedMealName = newValue;
-                        });
-                      },
-                      validator: (v) =>
-                          v == null ? 'Selecione uma refeição' : null,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Colors.redAccent),
-                    onPressed: () => _removeMeal(mealIndex),
-                  ),
-                ],
+  return GlassmorphicContainer(
+  borderRadius: 16,
+  margin: const EdgeInsets.symmetric(vertical: 8),
+  child: Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: meal.selectedMealName,
+                hint: const Text('Selecione a Refeição'),
+                items: _predefinedMeals.map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    meal.selectedMealName = newValue;
+                  });
+                },
+                validator: (v) =>
+                    v == null ? 'Selecione uma refeição' : null,
               ),
-              TextFormField(
-                  controller: meal.timeController,
-                  decoration:
-                      const InputDecoration(labelText: 'Horário (ex: 08:00)')),
-              const SizedBox(height: 16),
-              const Text('Alimentos:',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              ...meal.foods.asMap().entries.map((foodEntry) {
-                int foodIndex = foodEntry.key;
-                FoodEntry food = foodEntry.value;
-                return Row(
-                  children: [
-                    Expanded(
-                        child: TextFormField(
-                            controller: food.nameController,
-                            decoration:
-                                const InputDecoration(labelText: 'Alimento'))),
-                    const SizedBox(width: 8),
-                    Expanded(
-                        child: TextFormField(
-                            controller: food.quantityController,
-                            decoration: const InputDecoration(
-                                labelText: 'Quantidade'))),
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, size: 20),
-                      onPressed: () =>
-                          _removeFoodFromMeal(mealIndex, foodIndex),
-                    ),
-                  ],
-                );
-              }).toList(),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                    onPressed: () => _addFoodToMeal(mealIndex),
-                    child: const Text('Adicionar Alimento')),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              onPressed: () => _removeMeal(mealIndex),
+            ),
+          ],
+        ),
+        TextFormField(
+          controller: meal.timeController,
+          decoration: const InputDecoration(labelText: 'Horário (ex: 08:00)'),
+        ),
+        const SizedBox(height: 16),
+        const Text('Alimentos:', style: TextStyle(fontWeight: FontWeight.bold)),
+        ...meal.foods.asMap().entries.map((foodEntry) {
+          int foodIndex = foodEntry.key;
+          FoodEntry food = foodEntry.value;
+          return Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: food.nameController,
+                  decoration: const InputDecoration(labelText: 'Alimento'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextFormField(
+                  controller: food.quantityController,
+                  decoration: const InputDecoration(labelText: 'Quantidade'),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, size: 20),
+                onPressed: () => _removeFoodFromMeal(mealIndex, foodIndex),
               ),
             ],
+          );
+        }).toList(),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => _addFoodToMeal(mealIndex),
+            child: const Text('Adicionar Alimento'),
           ),
         ),
-      );
+      ],
+    ),
+  ),
+);
     }).toList();
   }
 

@@ -20,8 +20,35 @@ import '../models/dashboard_data.dart';
 import '../models/recalculation_result.dart';
 
 class ApiService {
-  final String _baseUrl =
-      kIsWeb ? "http://127.0.0.1:8000/api/v1" : "http://10.0.2.2:8000/api/v1";
+  final String _apiRoot = kIsWeb ? "http://127.0.0.1" : "http://10.0.2.2"; // sem :8000 se o Sail expõe 80
+  late final String _baseUrl = "$_apiRoot/api/v1"; // para rotas v1
+
+  Map<String, dynamic> _safeJsonObject(http.Response res) {
+  final ct = (res.headers['content-type'] ?? '').toLowerCase();
+  if (res.body.isEmpty || !ct.contains('application/json')) {
+    throw Exception('Resposta inesperada (${res.statusCode}): ${res.body}');
+  }
+  final decoded = jsonDecode(res.body);
+  if (decoded is! Map<String, dynamic>) {
+    throw Exception('JSON não é um objeto: ${decoded.runtimeType}');
+  }
+  return decoded;
+}
+
+Never _throwApiError(http.Response res, [Map<String, dynamic>? data]) {
+  final d = data ?? (res.body.isNotEmpty ? (jsonDecode(res.body) as Object?) : null);
+  String msg = 'Erro ${res.statusCode}';
+  if (d is Map && d['message'] != null) msg = d['message'].toString();
+  // agrega mensagens de validação se existirem
+  if (d is Map && d['errors'] is Map) {
+    final errs = (d['errors'] as Map).values
+        .expand((v) => (v is List ? v : [v]))
+        .map((e) => e.toString())
+        .join('\n');
+    if (errs.isNotEmpty) msg = '$msg\n$errs';
+  }
+  throw Exception(msg);
+}
 
   String _formatDate(DateTime date) {
     return "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
@@ -30,56 +57,66 @@ class ApiService {
   // --- MÉTODOS DE AUTENTICAÇÃO ---
 
   Future<String> login(String email, String password) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/login'),
-      headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(<String, String>{'email': email, 'password': password}),
-    );
+  final res = await http.post(
+    Uri.parse('$_baseUrl/login'),
+    headers: {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'Accept': 'application/json',
+    },
+    body: jsonEncode({'email': email, 'password': password}),
+  );
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body)['token'];
-    } else {
-      throw Exception(
-          jsonDecode(response.body)['message'] ?? 'Falha ao fazer login.');
+  final data = _safeJsonObject(res);
+
+  if (res.statusCode >= 200 && res.statusCode < 300) {
+    final token = data['token']?.toString();
+    if (token == null || token.isEmpty) {
+      throw Exception('Login sem token retornado.');
     }
+    return token;
   }
+  _throwApiError(res, data);
+}
 
   Future<void> register({
-    required String name,
-    required String email,
-    String? phoneNumber,
-    required String password,
-    required String passwordConfirmation,
-  }) async {
-    final Map<String, String> body = {
-      'name': name,
-      'email': email,
-      'password': password,
-      'password_confirmation': passwordConfirmation,
-    };
-    if (phoneNumber != null && phoneNumber.isNotEmpty) {
-      body['phone_number'] = phoneNumber;
-    }
-
-    final response = await http.post(
-      Uri.parse('$_baseUrl/register'),
-      headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
-
-    if (response.statusCode != 201) {
-      final data = jsonDecode(response.body);
-      final errorMessage =
-          (data['errors'] as Map<String, dynamic>).values.first[0];
-      throw Exception(errorMessage ?? 'Falha ao registrar.');
-    }
+  required String name,
+  required String email,
+  String? phoneNumber,
+  required String password,
+  required String passwordConfirmation,
+}) async {
+  final body = <String, dynamic>{
+    'name': name,
+    'email': email,
+    'password': password,
+    'password_confirmation': passwordConfirmation,
+  };
+  if (phoneNumber != null && phoneNumber.isNotEmpty) {
+    body['phone_number'] = phoneNumber;
   }
+
+  final res = await http.post(
+    Uri.parse('$_baseUrl/register'),
+    headers: {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'Accept': 'application/json',
+    },
+    body: jsonEncode(body),
+  );
+
+  // algumas APIs respondem 201 com corpo, outras 201 sem corpo; tratamos ambos
+  if (res.statusCode == 201 || res.statusCode == 200) {
+    return;
+  }
+
+  // se vier 4xx/5xx, tenta extrair JSON; se não der, lança mensagem genérica
+  try {
+    final data = _safeJsonObject(res);
+    _throwApiError(res, data);
+  } catch (_) {
+    _throwApiError(res);
+  }
+}
 
   Future<String> forgotPassword({required String identifier}) async {
     final response = await http.post(
@@ -208,22 +245,23 @@ class ApiService {
   // --- MÉTODOS DO USUÁRIO ---
 
   Future<User> getUser(String token) async {
-    // A rota para buscar o usuário autenticado é /api/user, não precisa de v1
-    final uri = kIsWeb
-        ? Uri.parse("http://127.0.0.1:8000/api/user")
-        : Uri.parse("http://10.0.2.2:8000/api/user");
+  final uri = Uri.parse("$_apiRoot/api/user"); // <- sem /v1
 
-    final response = await http.get(
-      uri,
-      headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
-    );
+  final res = await http.get(
+    uri,
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    },
+  );
 
-    if (response.statusCode == 200) {
-      return User.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Falha ao carregar os dados do usuário.');
-    }
+  if (res.statusCode == 200) {
+    return User.fromJson(jsonDecode(res.body));
+  } else {
+    // ajuda a depurar quando acontecer de novo
+    throw Exception('The route ${uri.path} could not be found. Status ${res.statusCode}. Body: ${res.body}');
   }
+}
 
   Future<User> updateUserProfile({
     required String token,

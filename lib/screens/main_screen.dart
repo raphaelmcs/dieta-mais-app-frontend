@@ -32,13 +32,15 @@ class _MainScreenState extends State<MainScreen> {
   Future<List<DietPlan>>? _plansFuture;
   DateTime _selectedDate = DateTime.now();
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedIndex = widget.initialIndex;
-    _reloadData();
-    _loadPlans();
-  }
+@override
+void initState() {
+  super.initState();
+  final pagesCount = 4;
+  _selectedIndex = widget.initialIndex.clamp(0, pagesCount - 1);
+  _reloadData();
+  _loadPlans();
+}
+
 
   // Função para recarregar os dados do Dashboard
   void _reloadData({DateTime? newDate}) async {
@@ -87,26 +89,24 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final List<Widget> widgetOptions = <Widget>[
-      DashboardScreen(
-        key: ValueKey(
-            _dashboardDataFuture), // Garante a reconstrução ao mudar a data
-        selectedDate: _selectedDate,
-        onPlanCreated: _loadPlans,
-        dashboardDataFuture: _dashboardDataFuture,
-        onRefresh: _reloadData,
-        onDateSelected: (date) => _reloadData(newDate: date),
-      ),
-      MealPlanScreen(
-        key: ValueKey(
-            _dashboardDataFuture), // Garante a reconstrução ao mudar a data
-        plansFuture: _plansFuture,
-        onRefresh: _loadPlans,
-        onDietPlanChanged: _onDietPlanChanged,
-      ),
-      const ReportsScreen(),
-      const ProfileScreen(),
-    ];
+final List<Widget> widgetOptions = <Widget>[
+  DashboardScreen(
+    key: ValueKey('dashboard-${_selectedDate.toIso8601String()}'),
+    selectedDate: _selectedDate,
+    onPlanCreated: _loadPlans,
+    dashboardDataFuture: _dashboardDataFuture,
+    onRefresh: _reloadData,
+    onDateSelected: (date) => _reloadData(newDate: date),
+  ),
+  MealPlanScreen(
+    key: ValueKey('plans-${_plansFuture.hashCode}'),
+    plansFuture: _plansFuture,
+    onRefresh: _loadPlans,
+    onDietPlanChanged: _onDietPlanChanged,
+  ),
+  const ReportsScreen(),
+  const ProfileScreen(),
+];
 
     return GradientScaffold(
       body: IndexedStack(

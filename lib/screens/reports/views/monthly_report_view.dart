@@ -12,6 +12,7 @@ import 'package:dieta_mais_app/models/daily_hydration_log.dart';
 import 'package:dieta_mais_app/api/api_service.dart';
 import 'package:dieta_mais_app/theme/app_theme.dart';
 import 'package:dieta_mais_app/widgets/glassmorphic_container.dart';
+import 'package:dieta_mais_app/widgets/glass_dialog.dart';
 
 class MonthlyReportFullData {
   final MonthlyReport report;
@@ -67,17 +68,18 @@ class _MonthlyReportViewState extends State<MonthlyReportView> {
     );
   }
 
-  void _selectMonth() async {
-    final selectedDate = await showMonthPicker(
-      context: context,
-      initialDate: _selectedMonth,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-    );
-    if (selectedDate != null) {
-      _loadReportForMonth(selectedDate);
-    }
+void _selectMonth() async {
+  final selectedDate = await showGlassMonthPicker(
+    context: context,
+    initialDate: _selectedMonth,
+    firstDate: DateTime(2020, 1),
+    lastDate: DateTime.now(),
+    locale: const Locale('pt', 'BR'),
+  );
+  if (selectedDate != null) {
+    _loadReportForMonth(selectedDate);
   }
+}
 
   // 2. NOVA FUNÇÃO PARA COMPARTILHAR
   void _shareReport(MonthlyReport report) {

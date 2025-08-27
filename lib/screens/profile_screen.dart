@@ -8,6 +8,7 @@ import '../api/api_service.dart';
 import '../models/user.dart';
 import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
+import 'package:dieta_mais_app/widgets/glass_dialog.dart';
 import 'login_screen.dart';
 
 class ProfileData {
@@ -341,29 +342,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showThemePicker(BuildContext context) {
-    final theme = Theme.of(context);
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+  final theme = Theme.of(context);
 
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return ListView.builder(
-          itemCount: AppThemes.themeOptions.length,
-          itemBuilder: (context, index) {
-            final themeOption = AppThemes.themeOptions[index];
-            return ListTile(
-              title: Text(themeOption.name),
-              onTap: () {
-                themeProvider.setTheme(themeOption);
-                Navigator.of(context).pop();
-              },
-              trailing: themeProvider.currentTheme.name == themeOption.name
-                  ? Icon(Icons.check, color: theme.textTheme.bodySmall?.color)
-                  : null,
-            );
+  showGlassBottomSheet(
+    context: context,
+    child: ListView.builder(
+      shrinkWrap: true,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: AppThemes.themeOptions.length,
+      itemBuilder: (context, index) {
+        final option = AppThemes.themeOptions[index];
+        final selected = themeProvider.currentTheme.name == option.name;
+
+        return ListTile(
+          title: Text(option.name),
+          trailing: selected ? Icon(Icons.check, color: theme.textTheme.bodySmall?.color) : null,
+          onTap: () {
+            themeProvider.setTheme(option);
+            Navigator.of(context).pop();
           },
         );
       },
-    );
-  }
+    ),
+  );
+}
 }
