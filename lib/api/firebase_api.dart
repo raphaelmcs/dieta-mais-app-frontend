@@ -117,16 +117,14 @@ class FirebaseApi {
     for (final t in times) {
       final scheduled = _nextInstanceOfTime(t);
       await _localNotifications.zonedSchedule(
-        id++,
-        'Hora da refeição',
-        'Está na hora da sua refeição!',
-        scheduled,
-        _notificationDetails(),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
+  id++,
+  'Hora da refeição',
+  'Está na hora da sua refeição!',
+  scheduled,
+  _notificationDetails(),
+  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  matchDateTimeComponents: DateTimeComponents.time,
+);
     }
   }
 
@@ -136,15 +134,14 @@ class FirebaseApi {
     final end = next.add(const Duration(hours: 24));
     while (next.isBefore(end)) {
       await _localNotifications.zonedSchedule(
-        id++,
-        'Hora de beber água',
-        'Mantenha-se hidratado!',
-        next,
-        _notificationDetails(),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
+  id++,
+  'Hora de beber água',
+  'Mantenha-se hidratado!',
+  next,
+  _notificationDetails(),
+  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+  
+);
       next = next.add(Duration(minutes: intervalMinutes));
     }
   }
