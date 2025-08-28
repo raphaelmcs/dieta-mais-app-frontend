@@ -16,7 +16,8 @@ import '../models/user.dart';
 import '../models/daily_calorie_log.dart';
 import '../models/daily_hydration_log.dart';
 import '../models/dashboard_data.dart';
-//import '../models/recalculated_diet.dart';
+import '../models/workout_set.dart';
+import '../models/workout.dart';
 import '../models/recalculation_result.dart';
 
 class Env {
@@ -321,39 +322,15 @@ class ApiService {
   }
 
   Future<DailySummary> getDailySummary(String token, DateTime date) async {
-    final uri = Uri.parse('$_baseUrl/daily-summary').replace(
-      queryParameters: {'date': _formatDate(date)},
-    );
+    final uri = Uri.parse('$_baseUrl/daily-summary')
+        .replace(queryParameters: {'date': _formatDate(date)});
     final response = await http.get(uri, headers: {
       'Accept': 'application/json',
-      'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer $token'
     });
-
-    // >>> DEBUG
-    // ignore: avoid_print
-    print('[daily-summary] -> GET $uri');
-    // ignore: avoid_print
-    print('[daily-summary] <- ${response.statusCode}');
-    // ignore: avoid_print
-    print('[daily-summary] ct: ${response.headers['content-type']}');
-    // ignore: avoid_print
-    print('[daily-summary] body: ${response.body}');
-    // <<< DEBUG
-
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200)
       return DailySummary.fromJson(jsonDecode(response.body));
-    } else {
-      // se vier JSON com 'message', mostre
-      try {
-        final data = jsonDecode(response.body);
-        final msg = (data is Map && data['message'] != null)
-            ? data['message'].toString()
-            : 'Falha ao carregar o resumo diário.';
-        throw Exception(msg);
-      } catch (_) {
-        throw Exception('Falha ao carregar o resumo diário.');
-      }
-    }
+    throw Exception('Falha ao carregar o resumo diário.');
   }
 
   Future<List<MonthlyAverage>> getAnnualReport(String token, int year) async {
@@ -688,5 +665,252 @@ class ApiService {
     } catch (_) {
       return null;
     }
+  }
+
+  // ===================== WORKOUTS =====================
+
+// Lista treinos, com filtros.
+  Future<List<Workout>> getWorkouts(
+    String token, {
+    DateTime? date,
+    DateTime? from,
+    DateTime? to,
+    String? status, // "pending" | "completed"
+    String? muscleGroup,
+  }) async {
+    final qp = <String, String>{};
+
+    if (date != null) {
+      qp['date'] = _formatDate(date);
+    } else {
+      if (from != null && to != null) {
+        qp['from'] = _formatDate(from);
+        qp['to'] = _formatDate(to);
+      }
+    }
+    if (status != null && status.isNotEmpty) qp['status'] = status;
+    if (muscleGroup != null && muscleGroup.isNotEmpty) {
+      qp['muscle_group'] = muscleGroup;
+    }
+
+    final uri = Uri.parse('$_baseUrl/workouts').replace(queryParameters: qp);
+
+    final res = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body);
+      if (body is List) {
+        return body
+            .map((e) => Workout.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      throw Exception('Resposta inesperada ao listar treinos.');
+    }
+
+    try {
+      final data = _safeJsonObject(res);
+      _throwApiError(res, data);
+    } catch (_) {
+      _throwApiError(res);
+    }
+  }
+
+// Cria treino (agora plannedDate é DateTime e há alias plannedDuration).
+  Future<Workout> createWorkout(
+    String token, {
+    required String title,
+    required String muscleGroup,
+    required DateTime plannedDate, // <— DateTime aqui!
+    int? plannedDurationMinutes,
+    int? plannedDuration, // alias
+    String? notes,
+    List<WorkoutSet>? sets,
+    String? status, // opcional (default no backend ou 'pending')
+  }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'muscle_group': muscleGroup,
+      'planned_date': _formatDate(plannedDate), // "YYYY-MM-DD"
+    };
+
+    final duration = plannedDurationMinutes ?? plannedDuration;
+    if (duration != null) body['planned_duration_minutes'] = duration;
+    if (notes != null && notes.isNotEmpty) body['notes'] = notes;
+    if (status != null && status.isNotEmpty) body['status'] = status;
+
+    if (sets != null && sets.isNotEmpty) {
+      body['sets'] = sets
+          .map((s) => {
+                'reps': s.reps,
+                'weight': s.weight,
+                'order': s.order,
+              })
+          .toList();
+    }
+
+    final res = await http.post(
+      Uri.parse('$_baseUrl/workouts'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode == 201) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return Workout.fromJson(data);
+    }
+
+    try {
+      final data = _safeJsonObject(res);
+      _throwApiError(res, data);
+    } catch (_) {
+      _throwApiError(res);
+    }
+  }
+
+// Atualiza treino; se enviar 'sets', substitui todos os atuais.
+  Future<Workout> updateWorkout(
+    String token, {
+    required int id,
+    String? title,
+    String? muscleGroup,
+    DateTime? plannedDate, // <— agora DateTime opcional
+    int? plannedDurationMinutes,
+    int? plannedDuration, // alias
+    String? status, // "pending" | "completed"
+    String? notes,
+    List<WorkoutSet>? sets,
+  }) async {
+    final body = <String, dynamic>{};
+
+    if (title != null) body['title'] = title;
+    if (muscleGroup != null) body['muscle_group'] = muscleGroup;
+    if (plannedDate != null) body['planned_date'] = _formatDate(plannedDate);
+
+    final duration = plannedDurationMinutes ?? plannedDuration;
+    if (duration != null) body['planned_duration_minutes'] = duration;
+
+    if (status != null) body['status'] = status;
+    if (notes != null) body['notes'] = notes;
+
+    if (sets != null) {
+      body['sets'] = sets
+          .map((s) => {
+                'reps': s.reps,
+                'weight': s.weight,
+                'order': s.order,
+              })
+          .toList();
+    }
+
+    final res = await http.put(
+      Uri.parse('$_baseUrl/workouts/$id'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return Workout.fromJson(data);
+    }
+
+    try {
+      final data = _safeJsonObject(res);
+      _throwApiError(res, data);
+    } catch (_) {
+      _throwApiError(res);
+    }
+  }
+
+// Alterna status.
+  Future<Workout> toggleWorkoutStatus(String token, int id) async {
+    final res = await http.patch(
+      Uri.parse('$_baseUrl/workouts/$id/toggle'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return Workout.fromJson(data);
+    }
+
+    try {
+      final data = _safeJsonObject(res);
+      _throwApiError(res, data);
+    } catch (_) {
+      _throwApiError(res);
+    }
+  }
+
+// Deleta.
+  Future<void> deleteWorkout(String token, int id) async {
+    final res = await http.delete(
+      Uri.parse('$_baseUrl/workouts/$id'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (res.statusCode == 204) return;
+
+    try {
+      final data = _safeJsonObject(res);
+      _throwApiError(res, data);
+    } catch (_) {
+      _throwApiError(res);
+    }
+  }
+
+  // Modalidades
+  Future<List<Map<String, dynamic>>> getWorkoutModalities(String token) async {
+    final uri = Uri.parse('$_baseUrl/workouts/modalities');
+    final res = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is List) {
+        return data.cast<Map<String, dynamic>>();
+      }
+      throw Exception('Resposta inesperada ao listar modalidades.');
+    }
+    _throwApiError(res, _safeJsonObject(res));
+  }
+
+// Exercícios por modalidade (slug: bodybuilding|crossfit|hyrox)
+  Future<List<Map<String, dynamic>>> getWorkoutExercises(
+      String token, String modalitySlug) async {
+    final uri =
+        Uri.parse('$_baseUrl/workouts/exercises?modality=$modalitySlug');
+    final res = await http.get(uri, headers: {
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+    });
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      if (data is Map && data['exercises'] is List) {
+        return (data['exercises'] as List).cast<Map<String, dynamic>>();
+      }
+      throw Exception('Resposta inesperada ao listar exercícios.');
+    }
+    _throwApiError(res, _safeJsonObject(res));
   }
 }

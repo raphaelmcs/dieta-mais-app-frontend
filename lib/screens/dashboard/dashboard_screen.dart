@@ -14,6 +14,7 @@ import 'widgets/meal_list_view.dart';
 import '../../widgets/glass_dialog.dart'; // onde está o showGlassDialog
 import '../../widgets/glassmorphic_container.dart'; // já usado pelo helper
 
+import '../../screens/profile_screen.dart';
 import '../login_screen.dart';
 import '../../api/api_service.dart';
 import '../../models/dashboard_data.dart';
@@ -136,86 +137,40 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _selectDate(BuildContext context) async {
-  DateTime tempSelectedDate = _selectedDate;
+    DateTime tempSelectedDate = _selectedDate;
 
-  final picked = await showGlassDialog<DateTime>(
-    context: context,
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Selecionar data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: 320,
-            height: 380,
-            child: CalendarDatePicker(
-              initialDate: _selectedDate,
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now(),
-              onDateChanged: (date) => tempSelectedDate = date,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(tempSelectedDate),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-
-  if (picked != null && picked != _selectedDate) {
-    setState(() {
-      _selectedDate = picked;
-      _dashboardDataFuture = _loadDashboardData(picked);
-    });
-  }
-}
-
-void _handleAddWater(DailySummary summary) async {
-  // Se não tem plano ativo e a meta é 0, peça para definir a meta primeiro (uma única vez)
-  if ((summary.hasActiveDiet == false) && (summary.hydration.goal == 0)) {
-    final shouldSetGoal = await showGlassDialog<bool>(
+    final picked = await showGlassDialog<DateTime>(
       context: context,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Definir meta de hidratação',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
+            const Text('Selecionar data',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 12),
-            const Text(
-              'Você ainda não tem um plano ativo. '
-              'Para acompanhar seu progresso de água, defina uma meta diária (em ml).',
+            SizedBox(
+              width: 320,
+              height: 380,
+              child: CalendarDatePicker(
+                initialDate: _selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+                onDateChanged: (date) => tempSelectedDate = date,
+              ),
             ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
-                  child: const Text('Depois'),
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
-                  child: const Text('Definir agora'),
-                  onPressed: () => Navigator.of(context).pop(true),
+                  onPressed: () => Navigator.of(context).pop(tempSelectedDate),
+                  child: const Text('OK'),
                 ),
               ],
             ),
@@ -224,19 +179,66 @@ void _handleAddWater(DailySummary summary) async {
       ),
     );
 
-    if (shouldSetGoal == true) {
-      // Abre o diálogo de meta já existente
-      _showUpdateGoalDialog(2000); // sugestão inicial de 2000 ml
-      return;
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _dashboardDataFuture = _loadDashboardData(picked);
+      });
     }
-    // Mesmo que escolha "Depois", ainda pode registrar água
-    _showAddWaterDialog();
-    return;
   }
 
-  // Caso normal
-  _showAddWaterDialog();
-}
+  void _handleAddWater(DailySummary summary) async {
+    // Se não tem plano ativo e a meta é 0, peça para definir a meta primeiro (uma única vez)
+    if ((summary.hasActiveDiet == false) && (summary.hydration.goal == 0)) {
+      final shouldSetGoal = await showGlassDialog<bool>(
+        context: context,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Definir meta de hidratação',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Você ainda não tem um plano ativo. '
+                'Para acompanhar seu progresso de água, defina uma meta diária (em ml).',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    child: const Text('Depois'),
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    child: const Text('Definir agora'),
+                    onPressed: () => Navigator.of(context).pop(true),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (shouldSetGoal == true) {
+        // Abre o diálogo de meta já existente
+        _showUpdateGoalDialog(2000); // sugestão inicial de 2000 ml
+        return;
+      }
+      // Mesmo que escolha "Depois", ainda pode registrar água
+      _showAddWaterDialog();
+      return;
+    }
+
+    // Caso normal
+    _showAddWaterDialog();
+  }
 
 // A lógica de Recálculo agora recebe os dados necessários como parâmetros
   Future<void> _handleOffPlanMeal(DailySummary summary) async {
@@ -423,136 +425,141 @@ void _handleAddWater(DailySummary summary) async {
 
   // ***** 3. MÉTODO PARA O DIÁLOGO DE ADICIONAR ÁGUA RESTAURADO *****
   void _showAddWaterDialog() {
-  final amountController = TextEditingController();
-  final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
+    final amountController = TextEditingController();
+    final formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
 
-  showGlassDialog<void>(
-    context: context,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: Theme.of(context).textTheme.titleLarge,
-              children: <TextSpan>[
-                const TextSpan(text: 'Adicionar Água\n'),
-                TextSpan(
-                  text: 'em $formattedDate',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.normal,
-                    color: Theme.of(context).unselectedWidgetColor,
+    showGlassDialog<void>(
+      context: context,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: Theme.of(context).textTheme.titleLarge,
+                children: <TextSpan>[
+                  const TextSpan(text: 'Adicionar Água\n'),
+                  TextSpan(
+                    text: 'em $formattedDate',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.normal,
+                      color: Theme.of(context).unselectedWidgetColor,
+                    ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Quantidade em ml'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    final amount = int.tryParse(amountController.text);
+                    if (amount != null && amount > 0) {
+                      Navigator.of(context)
+                          .pop(); // fecha o dialog antes da chamada
+                      try {
+                        final token = await _storage.read(key: 'auth_token');
+                        if (token == null) return;
+                        await _apiService.addHydrationLog(
+                          token: token,
+                          amount: amount,
+                          consumedAt: _selectedDate,
+                        );
+                        _reloadData();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Erro: $e'),
+                                backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    }
+                  },
+                  child: const Text('Registrar'),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: amountController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Quantidade em ml'),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  final amount = int.tryParse(amountController.text);
-                  if (amount != null && amount > 0) {
-                    Navigator.of(context).pop(); // fecha o dialog antes da chamada
-                    try {
-                      final token = await _storage.read(key: 'auth_token');
-                      if (token == null) return;
-                      await _apiService.addHydrationLog(
-                        token: token,
-                        amount: amount,
-                        consumedAt: _selectedDate,
-                      );
-                      _reloadData();
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
-                        );
-                      }
-                    }
-                  }
-                },
-                child: const Text('Registrar'),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _showUpdateGoalDialog(int currentGoal) {
-  final goalController = TextEditingController(text: currentGoal.toString());
+    final goalController = TextEditingController(text: currentGoal.toString());
 
-  showGlassDialog<void>(
-    context: context,
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Alterar Meta de Hidratação', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 12),
-          TextField(
-            controller: goalController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Nova meta em ml'),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  final goal = int.tryParse(goalController.text);
-                  if (goal != null && goal > 0) {
-                    try {
-                      final token = await _storage.read(key: 'auth_token');
-                      if (token == null) return;
-                      await _apiService.updateHydrationGoal(token, goal);
-                      if (mounted) Navigator.of(context).pop();
-                      _reloadData();
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erro ao salvar: $e'), backgroundColor: Colors.red),
-                        );
+    showGlassDialog<void>(
+      context: context,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Alterar Meta de Hidratação',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: goalController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Nova meta em ml'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    final goal = int.tryParse(goalController.text);
+                    if (goal != null && goal > 0) {
+                      try {
+                        final token = await _storage.read(key: 'auth_token');
+                        if (token == null) return;
+                        await _apiService.updateHydrationGoal(token, goal);
+                        if (mounted) Navigator.of(context).pop();
+                        _reloadData();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text('Erro ao salvar: $e'),
+                                backgroundColor: Colors.red),
+                          );
+                        }
                       }
                     }
-                  }
-                },
-                child: const Text('Salvar'),
-              ),
-            ],
-          ),
-        ],
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
-
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -586,9 +593,21 @@ void _handleAddWater(DailySummary summary) async {
                   color: Colors.yellowAccent),
               onPressed: _showRecalculatedPlanDialog,
             ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _reloadData,
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor:
+                    Theme.of(context).primaryColor.withOpacity(0.2),
+                child: const Icon(Icons.person, color: Colors.white),
+              ),
+            ),
           ),
         ],
       ),
@@ -612,16 +631,18 @@ void _handleAddWater(DailySummary summary) async {
                 child: Column(
                   children: [
                     // 1. CHAMA O WIDGET DO CARD DE HIDRATAÇÃO
-                                HydrationCard(
-              hydration: summary.hydration,
-              onAddWater: () => _handleAddWater(summary),  // <--- aqui
-              onUpdateGoal: () => _showUpdateGoalDialog(summary.hydration.goal),
-              gradient: _getHydrationGradient(
-                (summary.hydration.goal > 0)
-                  ? (summary.hydration.consumed / summary.hydration.goal)
-                  : 0.0,
-              ),
-            ),
+                    HydrationCard(
+                      hydration: summary.hydration,
+                      onAddWater: () => _handleAddWater(summary), // <--- aqui
+                      onUpdateGoal: () =>
+                          _showUpdateGoalDialog(summary.hydration.goal),
+                      gradient: _getHydrationGradient(
+                        (summary.hydration.goal > 0)
+                            ? (summary.hydration.consumed /
+                                summary.hydration.goal)
+                            : 0.0,
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     // 2. CHAMA O WIDGET DO CARROSSEL DE GRÁFICOS
                     ChartsPageView(

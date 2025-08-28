@@ -11,6 +11,7 @@ import '../providers/theme_provider.dart';
 import '../widgets/gradient_scaffold.dart';
 import 'dashboard/dashboard_screen.dart';
 import 'meal_plan_screen.dart';
+import 'workout/workout_screen.dart';
 import 'profile_screen.dart';
 import 'reports_screen.dart';
 
@@ -32,15 +33,14 @@ class _MainScreenState extends State<MainScreen> {
   Future<List<DietPlan>>? _plansFuture;
   DateTime _selectedDate = DateTime.now();
 
-@override
-void initState() {
-  super.initState();
-  final pagesCount = 4;
-  _selectedIndex = widget.initialIndex.clamp(0, pagesCount - 1);
-  _reloadData();
-  _loadPlans();
-}
-
+  @override
+  void initState() {
+    super.initState();
+    final pagesCount = 4;
+    _selectedIndex = widget.initialIndex.clamp(0, pagesCount - 1);
+    _reloadData();
+    _loadPlans();
+  }
 
   // Função para recarregar os dados do Dashboard
   void _reloadData({DateTime? newDate}) async {
@@ -89,24 +89,25 @@ void initState() {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-final List<Widget> widgetOptions = <Widget>[
-  DashboardScreen(
-    key: ValueKey('dashboard-${_selectedDate.toIso8601String()}'),
-    selectedDate: _selectedDate,
-    onPlanCreated: _loadPlans,
-    dashboardDataFuture: _dashboardDataFuture,
-    onRefresh: _reloadData,
-    onDateSelected: (date) => _reloadData(newDate: date),
-  ),
-  MealPlanScreen(
-    key: ValueKey('plans-${_plansFuture.hashCode}'),
-    plansFuture: _plansFuture,
-    onRefresh: _loadPlans,
-    onDietPlanChanged: _onDietPlanChanged,
-  ),
-  const ReportsScreen(),
-  const ProfileScreen(),
-];
+    final List<Widget> widgetOptions = <Widget>[
+      DashboardScreen(
+        key: ValueKey('dashboard-${_selectedDate.toIso8601String()}'),
+        selectedDate: _selectedDate,
+        onPlanCreated: _loadPlans,
+        dashboardDataFuture: _dashboardDataFuture,
+        onRefresh: _reloadData,
+        onDateSelected: (date) => _reloadData(newDate: date),
+      ),
+      MealPlanScreen(
+        key: ValueKey('plans-${_plansFuture.hashCode}'),
+        plansFuture: _plansFuture,
+        onRefresh: _loadPlans,
+        onDietPlanChanged: _onDietPlanChanged,
+      ),
+      const WorkoutScreen(), // <-- nova aba Treino
+      const ReportsScreen(),
+      //const ProfileScreen(),
+    ];
 
     return GradientScaffold(
       body: IndexedStack(
@@ -141,9 +142,12 @@ final List<Widget> widgetOptions = <Widget>[
                 BottomNavigationBarItem(
                     icon: Icon(Icons.restaurant_menu), label: 'Plano'),
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.bar_chart), label: 'Relatórios'),
+                    icon: Icon(Icons.fitness_center),
+                    label: 'Treino'), // <-- novo
                 BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline), label: 'Perfil'),
+                    icon: Icon(Icons.bar_chart), label: 'Relatórios'),
+                /*  BottomNavigationBarItem(
+                    icon: Icon(Icons.person_outline), label: 'Perfil'), */
               ],
               currentIndex: _selectedIndex,
               onTap: _onItemTapped,
