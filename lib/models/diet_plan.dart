@@ -1,12 +1,14 @@
+// lib/models/diet_plan.dart
 import 'meal.dart';
+import 'dart:convert';
 
 class DietPlan {
   final int id;
-  final String name; // Nome do plano
+  final String name;
   final bool isActive;
   final int targetCalories;
   final DateTime createdAt;
-  final List<Meal>? meals; // Lista de refeições
+  final List<Meal>? meals;
 
   DietPlan({
     required this.id,
@@ -18,15 +20,36 @@ class DietPlan {
   });
 
   factory DietPlan.fromJson(Map<String, dynamic> json) {
+    List<Meal>? meals;
+
+    final rawMeals = json['meals'];
+
+    if (rawMeals is List) {
+      meals = rawMeals
+          .map((i) => Meal.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } else if (rawMeals is String && rawMeals.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawMeals);
+        if (decoded is List) {
+          meals = decoded
+              .map((i) => Meal.fromJson(i as Map<String, dynamic>))
+              .toList();
+        }
+      } catch (_) {
+        // ignora se não for um JSON válido
+      }
+    } else {
+      meals = null;
+    }
+
     return DietPlan(
       id: json['id'],
-      name: json['name'] ?? 'Plano Importado', // Nome padrão
+      name: json['name'] ?? 'Plano',
       isActive: json['is_active'] ?? false,
       targetCalories: json['target_calories'] ?? 0,
       createdAt: DateTime.parse(json['created_at']),
-      meals: json.containsKey('meals') && json['meals'] != null
-          ? (json['meals'] as List).map((i) => Meal.fromJson(i)).toList()
-          : null,
+      meals: meals,
     );
   }
 }

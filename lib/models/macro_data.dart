@@ -1,11 +1,11 @@
 // lib/models/macro_data.dart
 
 class AverageData {
-  final int calories;     // kcal
-  final int protein;      // g
-  final int carbs;        // g
-  final int fats;         // g
-  final int hydrationMl;  // ml
+  final int calories; // kcal
+  final int protein; // g
+  final int carbs; // g
+  final int fats; // g
+  final int hydrationMl; // ml
 
   AverageData({
     required this.calories,
@@ -26,15 +26,20 @@ class AverageData {
 
   factory AverageData.fromJson(Map<String, dynamic>? json) {
     if (json == null) {
-      return AverageData(calories: 0, protein: 0, carbs: 0, fats: 0, hydrationMl: 0);
+      return AverageData(
+          calories: 0, protein: 0, carbs: 0, fats: 0, hydrationMl: 0);
     }
 
     // Aceita variações comuns vindas do backend
-    final calories    = _asInt(json['calories'] ?? json['kcal']);
-    final protein     = _asInt(json['protein'] ?? json['proteins']);
-    final carbs       = _asInt(json['carbs']   ?? json['carbohydrates'] ?? json['carb']);
-    final fats        = _asInt(json['fats']    ?? json['fat']);
-    final hydrationMl = _asInt(json['hydration_ml'] ?? json['hydrationMl'] ?? json['water_ml'] ?? json['water']);
+    final calories = _asInt(json['calories'] ?? json['kcal']);
+    final protein = _asInt(json['protein'] ?? json['proteins']);
+    final carbs =
+        _asInt(json['carbs'] ?? json['carbohydrates'] ?? json['carb']);
+    final fats = _asInt(json['fats'] ?? json['fats']);
+    final hydrationMl = _asInt(json['hydration_ml'] ??
+        json['hydrationMl'] ??
+        json['water_ml'] ??
+        json['water']);
 
     return AverageData(
       calories: calories,
@@ -46,10 +51,10 @@ class AverageData {
   }
 
   Map<String, dynamic> toJson() => {
-    'calories': calories,
-    'protein': protein,
-    'carbs': carbs,
-    'fats': fats,
-    'hydration_ml': hydrationMl,
-  };
+        'calories': calories,
+        'protein': protein,
+        'carbs': carbs,
+        'fats': fats,
+        'hydration_ml': hydrationMl,
+      };
 }

@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/gradient_scaffold.dart';
 import 'package:dieta_mais_app/widgets/glass_dialog.dart';
 import 'login_screen.dart';
+import '../api/firebase_api.dart';
 import 'reminder_settings_screen.dart';
 
 class ProfileData {
@@ -52,18 +53,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _updateSetting(
       String key, bool value, Map<String, bool> currentSettings) async {
-    setState(() {
-      currentSettings[key] = value;
-    });
+    setState(() => currentSettings[key] = value);
 
     try {
       final token = await _storage.read(key: 'auth_token');
       if (token == null) throw Exception('Token não encontrado');
+
       await _apiService.updateUserSettings(token, {key: value});
+
+      // 🔑 espelha localmente para o FirebaseApi ler
+      // mapeie as chaves do backend para as do storage
+      if (key == 'wants_hydration_reminders') {
+        await _storage.write(
+            key: 'wants_hydration_reminders', value: value ? '1' : '0');
+      } else if (key == 'wants_meal_reminders') {
+        await _storage.write(
+            key: 'wants_meal_reminders', value: value ? '1' : '0');
+      }
+
+      // 🔁 reconfigura os agendamentos conforme os toggles
+      await FirebaseApi().scheduleRemindersFromPreferences();
     } catch (e) {
-      setState(() {
-        currentSettings[key] = !value;
-      });
+      setState(() => currentSettings[key] = !value);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -354,29 +365,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showThemePicker(BuildContext context) {
-  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-  final theme = Theme.of(context);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final theme = Theme.of(context);
 
-  showGlassBottomSheet(
-    context: context,
-    child: ListView.builder(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: AppThemes.themeOptions.length,
-      itemBuilder: (context, index) {
-        final option = AppThemes.themeOptions[index];
-        final selected = themeProvider.currentTheme.name == option.name;
+    showGlassBottomSheet(
+      context: context,
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: AppThemes.themeOptions.length,
+        itemBuilder: (context, index) {
+          final option = AppThemes.themeOptions[index];
+          final selected = themeProvider.currentTheme.name == option.name;
 
-        return ListTile(
-          title: Text(option.name),
-          trailing: selected ? Icon(Icons.check, color: theme.textTheme.bodySmall?.color) : null,
-          onTap: () {
-            themeProvider.setTheme(option);
-            Navigator.of(context).pop();
-          },
-        );
-      },
-    ),
-  );
-}
+          return ListTile(
+            title: Text(option.name),
+            trailing: selected
+                ? Icon(Icons.check, color: theme.textTheme.bodySmall?.color)
+                : null,
+            onTap: () {
+              themeProvider.setTheme(option);
+              Navigator.of(context).pop();
+            },
+          );
+        },
+      ),
+    );
+  }
 }
