@@ -57,6 +57,7 @@ dependencies:
   intl_phone_field: ^3.2.0
   pinput: ^5.0.0
   timezone: ^0.10.1
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

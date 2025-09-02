@@ -24,11 +24,13 @@ class WelcomeEmptyStateScreen extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
                   child: _GlassCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 28),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.palette_outlined, size: 72, color: cs.onSurface.withOpacity(.85)),
+                        Icon(Icons.palette_outlined,
+                            size: 72, color: cs.onSurface.withOpacity(.85)),
                         const SizedBox(height: 16),
                         Text(
                           'Personalize sua Experiência',
@@ -53,10 +55,13 @@ class WelcomeEmptyStateScreen extends StatelessWidget {
                           spacing: 16,
                           runSpacing: 16,
                           children: AppThemes.themeOptions.map((themeOption) {
-                            final isSelected = themeProvider.currentTheme.name == themeOption.name;
-                            final deco = (themeOption.background is BoxDecoration)
-                                ? themeOption.background as BoxDecoration
-                                : const BoxDecoration();
+                            final isSelected =
+                                themeProvider.currentTheme.name ==
+                                    themeOption.name;
+                            final deco =
+                                (themeOption.background is BoxDecoration)
+                                    ? themeOption.background as BoxDecoration
+                                    : const BoxDecoration();
                             return GestureDetector(
                               onTap: () => themeProvider.setTheme(themeOption),
                               child: AnimatedContainer(
@@ -68,7 +73,9 @@ class WelcomeEmptyStateScreen extends StatelessWidget {
                                   gradient: deco.gradient,
                                   color: deco.color,
                                   border: Border.all(
-                                    color: isSelected ? cs.primary : Colors.white.withOpacity(0.25),
+                                    color: isSelected
+                                        ? cs.primary
+                                        : Colors.white.withOpacity(0.25),
                                     width: isSelected ? 3 : 1,
                                   ),
                                   boxShadow: [
@@ -81,7 +88,8 @@ class WelcomeEmptyStateScreen extends StatelessWidget {
                                   ],
                                 ),
                                 child: isSelected
-                                    ? const Icon(Icons.check, color: Colors.white, size: 28)
+                                    ? const Icon(Icons.check,
+                                        color: Colors.white, size: 28)
                                     : null,
                               ),
                             );
@@ -95,7 +103,8 @@ class WelcomeEmptyStateScreen extends StatelessWidget {
                         Text(
                           'A seguir, vamos configurar seu primeiro plano alimentar.',
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: cs.onSurfaceVariant),
                         ),
                         const SizedBox(height: 20),
 
@@ -105,7 +114,8 @@ class WelcomeEmptyStateScreen extends StatelessWidget {
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
-                                builder: (context) => const MainScreen(initialIndex: 1),
+                                builder: (context) =>
+                                    const MainScreen(initialIndex: 1),
                               ),
                             );
                           },
@@ -116,7 +126,8 @@ class WelcomeEmptyStateScreen extends StatelessWidget {
                         TextButton(
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(builder: (context) => const MainScreen()),
+                              MaterialPageRoute(
+                                  builder: (context) => const MainScreen()),
                             );
                           },
                           child: const Text('Configurar Plano Depois'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'firebase_options.dart';
@@ -15,6 +16,10 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+// registre o handler de mensagens em background (top-level function)
+  FirebaseMessaging.onBackgroundMessage(handleBackgroundMessage);
+
   final firebaseApi = FirebaseApi();
   await firebaseApi.initNotifications();
   await firebaseApi.scheduleRemindersFromPreferences();

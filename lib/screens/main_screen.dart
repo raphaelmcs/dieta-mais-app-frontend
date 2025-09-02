@@ -1,6 +1,5 @@
+// lib/screens/main_screen.dart
 import 'dart:ui';
-import 'package:dieta_mais_app/models/dashboard_data.dart';
-import 'package:dieta_mais_app/models/diet_plan.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -9,11 +8,17 @@ import '../api/api_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/gradient_scaffold.dart';
+
+// Modelos
+import 'package:dieta_mais_app/models/dashboard_data.dart';
+import 'package:dieta_mais_app/models/diet_plan.dart';
+
+// Telas
 import 'dashboard/dashboard_screen.dart';
 import 'meal_plan_screen.dart';
-import 'workout/workout_screen.dart';
-import 'profile_screen.dart';
+import 'food/food_photo_screen.dart';
 import 'reports_screen.dart';
+// import 'profile_screen.dart'; // Perfil segue acessível pela Dashboard (canto superior direito), se a sua Dashboard já faz isso
 
 class MainScreen extends StatefulWidget {
   final int initialIndex;
@@ -28,7 +33,7 @@ class _MainScreenState extends State<MainScreen> {
   final _apiService = ApiService();
   final _storage = const FlutterSecureStorage();
 
-  // O estado do Dashboard e dos Planos vive aqui
+  // Estado do Dashboard e dos Planos
   Future<DashboardData>? _dashboardDataFuture;
   Future<List<DietPlan>>? _plansFuture;
   DateTime _selectedDate = DateTime.now();
@@ -36,13 +41,13 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    final pagesCount = 4;
+    final pagesCount = 4; // Dashboard, Plano, Foto do Prato, Relatórios
     _selectedIndex = widget.initialIndex.clamp(0, pagesCount - 1);
     _reloadData();
     _loadPlans();
   }
 
-  // Função para recarregar os dados do Dashboard
+  // Recarrega dados do Dashboard
   void _reloadData({DateTime? newDate}) async {
     if (newDate != null) {
       setState(() {
@@ -56,7 +61,7 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  // Função para recarregar a lista de Planos
+  // Recarrega lista de Planos
   void _loadPlans() async {
     final token = await _storage.read(key: 'auth_token');
     if (token == null) return;
@@ -65,21 +70,20 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  // Função central para quando um plano é alterado
+  // Ação central quando um plano é criado/alterado/ativado/excluído
   void _onDietPlanChanged() {
-    _reloadData(); // Recarrega o Dashboard
-    _loadPlans(); // Recarrega a lista de planos
-    // Se o usuário não estiver no Dashboard, o leva para lá
+    _reloadData(); // Atualiza Dashboard
+    _loadPlans(); // Atualiza lista de planos
     if (_selectedIndex != 0) {
       setState(() {
-        _selectedIndex = 0;
+        _selectedIndex = 0; // volta para Dashboard
       });
     }
   }
 
   void _onItemTapped(int index) {
-    if (index == 0) _reloadData(); // Sempre recarrega o dashboard ao entrar
-    if (index == 1) _loadPlans(); // Sempre recarrega os planos ao entrar
+    if (index == 0) _reloadData(); // sempre recarrega o Dashboard ao entrar
+    if (index == 1) _loadPlans(); // sempre recarrega os planos ao entrar
     setState(() {
       _selectedIndex = index;
     });
@@ -89,7 +93,8 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final List<Widget> widgetOptions = <Widget>[
+    final List<Widget> pages = <Widget>[
+      // DASHBOARD
       DashboardScreen(
         key: ValueKey('dashboard-${_selectedDate.toIso8601String()}'),
         selectedDate: _selectedDate,
@@ -98,21 +103,26 @@ class _MainScreenState extends State<MainScreen> {
         onRefresh: _reloadData,
         onDateSelected: (date) => _reloadData(newDate: date),
       ),
+
+      // PLANO ALIMENTAR
       MealPlanScreen(
         key: ValueKey('plans-${_plansFuture.hashCode}'),
         plansFuture: _plansFuture,
         onRefresh: _loadPlans,
         onDietPlanChanged: _onDietPlanChanged,
       ),
-      const WorkoutScreen(), // <-- nova aba Treino
+
+      // FOTO DO PRATO (substitui "Treino")
+      const FoodPhotoScreen(),
+
+      // RELATÓRIOS
       const ReportsScreen(),
-      //const ProfileScreen(),
     ];
 
     return GradientScaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: widgetOptions,
+        children: pages,
       ),
       bottomNavigationBar: ClipRRect(
         borderRadius: const BorderRadius.only(
@@ -136,22 +146,27 @@ class _MainScreenState extends State<MainScreen> {
               elevation: 0,
               selectedItemColor: theme.primaryColor,
               unselectedItemColor: theme.unselectedWidgetColor,
-              items: const <BottomNavigationBarItem>[
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.home_filled), label: 'Resumo'),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.restaurant_menu), label: 'Plano'),
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.fitness_center),
-                    label: 'Treino'), // <-- novo
-                BottomNavigationBarItem(
-                    icon: Icon(Icons.bar_chart), label: 'Relatórios'),
-                /*  BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline), label: 'Perfil'), */
-              ],
+              type: BottomNavigationBarType.fixed,
               currentIndex: _selectedIndex,
               onTap: _onItemTapped,
-              type: BottomNavigationBarType.fixed,
+              items: const <BottomNavigationBarItem>[
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_filled),
+                  label: 'Resumo',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.restaurant_menu),
+                  label: 'Plano',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.camera_enhance_outlined),
+                  label: 'Foto',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.bar_chart),
+                  label: 'Relatórios',
+                ),
+              ],
             ),
           ),
         ),

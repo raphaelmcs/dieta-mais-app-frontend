@@ -19,6 +19,12 @@ import '../models/dashboard_data.dart';
 import '../models/workout_set.dart';
 import '../models/workout.dart';
 import '../models/recalculation_result.dart';
+import '../models/workout_exercise_dto.dart';
+import '../models/workout_session.dart';
+import '../models/workout_item.dart';
+import '../models/program_dtos.dart';
+import '../models/feature_flags.dart';
+import '../models/food_estimate.dart';
 
 class Env {
   // Ex.: --dart-define=API_BASE_URL=http://10.0.2.2:33366/api/v1
@@ -57,6 +63,26 @@ class ApiService {
         : '$_apiRoot/$normalized');
     return uri.replace(queryParameters: q?.map((k, v) => MapEntry(k, '$v')));
   }
+
+  Map<String, String> _authHeaders(String token) => {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+  Future<Map<String, String>> _authHeadersAuto() async {
+    final token = await getAuthToken();
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+
+  Map<String, String> _authJsonHeaders(String token) => {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
 
   Map<String, dynamic> _safeJsonObject(http.Response res) {
     final ct = (res.headers['content-type'] ?? '').toLowerCase();
@@ -896,21 +922,328 @@ class ApiService {
   }
 
 // Exercícios por modalidade (slug: bodybuilding|crossfit|hyrox)
-  Future<List<Map<String, dynamic>>> getWorkoutExercises(
-      String token, String modalitySlug) async {
+  Future<List<WorkoutExerciseDto>> getWorkoutExercises(
+    String token,
+    String modalitySlug,
+  ) async {
     final uri =
         Uri.parse('$_baseUrl/workouts/exercises?modality=$modalitySlug');
-    final res = await http.get(uri, headers: {
-      'Accept': 'application/json',
-      'Authorization': 'Bearer $token',
-    });
+    final res = await http.get(uri, headers: _authHeaders(token));
     if (res.statusCode == 200) {
       final data = jsonDecode(res.body);
-      if (data is Map && data['exercises'] is List) {
-        return (data['exercises'] as List).cast<Map<String, dynamic>>();
-      }
-      throw Exception('Resposta inesperada ao listar exercícios.');
+      final list = data['exercises'] as List;
+      return list.map((e) => WorkoutExerciseDto.fromJson(e)).toList();
     }
-    _throwApiError(res, _safeJsonObject(res));
+    throw Exception('Falha ao carregar exercícios');
   }
+
+  // =============== WORKOUT: grupos musculares por modalidade ===============
+  Future<List<WorkoutGroupDto>> getMuscleGroups(
+      String token, String modalitySlug) async {
+    final uri =
+        Uri.parse('$_baseUrl/workouts/muscle-groups?modality=$modalitySlug');
+    final res = await http.get(uri, headers: _authHeaders(token));
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      return list.map((e) => WorkoutGroupDto.fromJson(e)).toList();
+    }
+    throw Exception('Falha ao carregar grupos musculares '
+        '(HTTP ${res.statusCode})');
+  }
+
+  // =============== WORKOUT: exercícios por modalidade (e opcional grupo) ===============
+  Future<List<WorkoutExerciseDto>> getExercisesByModality(
+    String token,
+    String modalitySlug, {
+    String? group,
+  }) async {
+    final qp = {
+      'modality': modalitySlug,
+      if (group != null && group.isNotEmpty) 'group': group,
+    };
+    final uri =
+        Uri.parse('$_baseUrl/workouts/exercises').replace(queryParameters: qp);
+
+    final res = await http.get(uri, headers: _authHeaders(token));
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      final list = data is Map ? (data['exercises'] as List) : (data as List);
+      return list.map((e) => WorkoutExerciseDto.fromJson(e)).toList();
+    }
+
+    throw Exception('Falha ao carregar exercícios (${res.statusCode})');
+  }
+
+  // =============== WORKOUT: cria sessão (série do dia) ===============
+  Future<void> createWorkoutSession({
+    required String token,
+    required DateTime plannedDate,
+    required String modality, // 'bodybuilding' | 'crossfit' | 'hyrox'
+    required String name,
+    required List<WorkoutItem> items,
+  }) async {
+    final body = {
+      'name': name,
+      'modality': modality,
+      'planned_date': DateFormat('yyyy-MM-dd').format(plannedDate),
+      'items': items.map((it) => it.toApiJson()).toList(),
+    };
+
+    final res = await http.post(
+      Uri.parse('$_baseUrl/workouts/sessions'),
+      headers: _authJsonHeaders(token),
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode != 201) {
+      String msg = 'Falha ao salvar sessão (HTTP ${res.statusCode})';
+      try {
+        final j = jsonDecode(res.body);
+        if (j is Map && j['message'] != null) msg = j['message'].toString();
+      } catch (_) {}
+      throw Exception(msg);
+    }
+  }
+}
+
+// ====================== PROGRAMS ======================
+
+extension ProgramsApi on ApiService {
+  // GET /v1/workouts/programs
+  Future<List<ProgramDto>> getPrograms(String token) async {
+    final uri = Uri.parse('$_baseUrl/workouts/programs');
+    final res = await http.get(uri, headers: _authHeaders(token));
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List;
+      return list
+          .map((e) => ProgramDto.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw Exception('Falha ao listar séries (programas)');
+  }
+
+// GET /v1/workouts/programs/{id}
+  Future<Map<String, dynamic>> getProgramDetail(String token, int id) async {
+    final uri = Uri.parse('$_baseUrl/workouts/programs/$id');
+    final res = await http.get(uri, headers: _authHeaders(token));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Falha ao carregar série');
+  }
+
+// POST /v1/workouts/programs
+  Future<ProgramDto> createProgram({
+    required String token,
+    required String name,
+    required String modality,
+    required List<ProgramBlockInput> blocks,
+  }) async {
+    final body = {
+      'name': name,
+      'modality': modality,
+      'blocks': blocks.map((b) => b.toJson()).toList(),
+    };
+    final res = await http.post(
+      Uri.parse('$_baseUrl/workouts/programs'),
+      headers: _authJsonHeaders(token),
+      body: jsonEncode(body),
+    );
+    if (res.statusCode == 201) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return ProgramDto.fromJson(data);
+    }
+    throw Exception('Falha ao criar série');
+  }
+
+// PUT /v1/workouts/programs/{id}
+  Future<ProgramDto> updateProgram({
+    required String token,
+    required int id,
+    String? name,
+    List<ProgramBlockInput>? blocks,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (blocks != null) {
+      body['blocks'] = blocks.map((b) => b.toJson()).toList();
+    }
+    final res = await http.put(
+      Uri.parse('$_baseUrl/workouts/programs/$id'),
+      headers: _authJsonHeaders(token),
+      body: jsonEncode(body),
+    );
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return ProgramDto.fromJson(data);
+    }
+    throw Exception('Falha ao atualizar série');
+  }
+
+// DELETE /v1/workouts/programs/{id}
+  Future<void> deleteProgram(String token, int id) async {
+    final res = await http.delete(
+      Uri.parse('$_baseUrl/workouts/programs/$id'),
+      headers: _authHeaders(token),
+    );
+    if (res.statusCode != 204) {
+      throw Exception('Falha ao excluir série');
+    }
+  }
+
+// POST /v1/workouts/programs/{id}/activate
+  Future<void> activateProgram({
+    required String token,
+    required int id,
+    required DateTime startDate,
+    int? weeks,
+    DateTime? endDate,
+  }) async {
+    final body = {
+      'start_date': DateFormat('yyyy-MM-dd').format(startDate),
+      if (weeks != null) 'weeks': weeks,
+      if (endDate != null) 'end_date': DateFormat('yyyy-MM-dd').format(endDate),
+    };
+
+    final res = await http.post(
+      Uri.parse('$_baseUrl/workouts/programs/$id/activate'),
+      headers: _authJsonHeaders(token),
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode != 200) {
+      String msg = 'Falha ao ativar série';
+      try {
+        final j = jsonDecode(res.body);
+        if (j is Map && j['message'] != null) msg = j['message'].toString();
+      } catch (_) {}
+      throw Exception(msg);
+    }
+  }
+
+  // Cria uma série (program) de musculação e ativa, gerando sessões no calendário.
+  Future<Map<String, dynamic>> composeAndActivateProgram({
+    required String token,
+    required String name, // ex.: "Série ABC"
+    required String modality, // 'bodybuilding' | 'crossfit' | 'hyrox'
+    required DateTime startDate,
+    required DateTime endDate,
+    required List<String> trainingDays, // ex.: ['mon','tue','thu','fri']
+    required List<Map<String, dynamic>> blocks,
+  }) async {
+    final body = {
+      'name': name,
+      'modality': modality,
+      'start_date': DateFormat('yyyy-MM-dd').format(startDate),
+      'end_date': DateFormat('yyyy-MM-dd').format(endDate),
+      'training_days': trainingDays,
+      'blocks': blocks,
+    };
+
+    final res = await http.post(
+      Uri.parse('$_baseUrl/workouts/programs/compose-activate'),
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (res.statusCode == 201) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+
+    try {
+      final j = jsonDecode(res.body);
+      throw Exception(j['message'] ?? 'Falha ao criar série');
+    } catch (_) {
+      throw Exception('Falha ao criar série (HTTP ${res.statusCode})');
+    }
+  }
+
+  //extension DietaMaisFeatures on ApiService {
+  Future<FeatureFlags> fetchFeatureFlags() async {
+    final uri = Uri.parse("$_baseUrl/features");
+    final response = await http.get(uri, headers: await _authHeadersAuto());
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return FeatureFlags.fromJson(data);
+    }
+    throw Exception('Falha ao carregar feature flags');
+  }
+
+  /// Envia a imagem e recebe estimativa de calorias.
+  Future<FoodEstimate> estimateCaloriesFromPhoto(File imageFile) async {
+    final uri = Uri.parse("$_baseUrl/food-estimator/estimate");
+    final req = http.MultipartRequest('POST', uri);
+    req.headers.addAll(await _authHeadersAuto());
+    req.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+    final streamed = await req.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return FoodEstimate.fromJson(data);
+    }
+    throw Exception('Falha ao estimar calorias: ${response.body}');
+  }
+
+  /* Future<Map<String, String>> _authHeaders() async {
+    // se você já tem token no storage, inclua aqui
+    // final token = await _storage.read(key: 'token');
+    return {
+      'Accept': 'application/json',
+      // if (token != null) 'Authorization': 'Bearer $token',
+    };
+  } */
+
+  Future<Map<String, dynamic>> saveEstimatedMeal(FoodEstimate estimate,
+      {DateTime? takenAt}) async {
+    final uri = Uri.parse("$_baseUrl/food-estimator/save-meal");
+    final body = estimate.toJson(takenAt: takenAt);
+    final resp = await http.post(
+      uri,
+      headers: {
+        ...(await _authHeadersAuto()),
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception(
+        'Falha ao salvar refeição: ${resp.statusCode} ${resp.body}');
+  }
+
+  Future<void> registerEstimateIntoMealLog(FoodEstimate estimate,
+      {DateTime? consumedAt, int? dietId}) async {
+    final uri = Uri.parse("$_baseUrl/food-estimator/register-meal-log");
+    final body =
+        estimate.toMealLogPayload(consumedAt: consumedAt, dietId: dietId);
+
+    final resp = await http.post(
+      uri,
+      headers: {
+        ...(await _authHeadersAuto()),
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      throw Exception(
+          'Falha ao registrar no MealLog: ${resp.statusCode} ${resp.body}');
+    }
+  }
+}
+
+/// DTO simples para grupos
+class WorkoutGroupDto {
+  final String name;
+  WorkoutGroupDto(this.name);
+  factory WorkoutGroupDto.fromJson(Map<String, dynamic> j) =>
+      WorkoutGroupDto(j['name'] as String);
 }

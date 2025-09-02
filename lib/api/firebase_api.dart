@@ -51,35 +51,78 @@ class FirebaseApi {
   };
 
   Future<void> initNotifications() async {
+    // Timezone primeiro
     tz.initializeTimeZones();
-    tz.setLocalLocation(
-        tz.getLocation('America/Sao_Paulo')); // ajuste se preciso
+    tz.setLocalLocation(tz.getLocation('America/Sao_Paulo'));
 
-    const androidInit =
-        AndroidInitializationSettings('@mipmap/ic_notification');
-    const initSettings = InitializationSettings(android: androidInit);
-    await _local.initialize(initSettings);
+    // ==== INIT LOCAL NOTIFICATIONS (Android + iOS) ====
+    const androidInit = AndroidInitializationSettings(
+      // Use um ícone que EXISTE. Troque para ic_notification quando criar o asset.
+      '@mipmap/ic_launcher',
+    );
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
 
+    // Envolve em try/catch para emuladores chatos
+    try {
+      await _local.initialize(initSettings);
+    } catch (e) {
+      debugPrint('LocalNotifications initialize error: $e');
+    }
+
+    // ==== PERMISSÕES ====
     if (Platform.isAndroid) {
       final android = _local.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       try {
+        // Android 13+ precisa dessa permissão
         final enabled = await android?.areNotificationsEnabled() ?? true;
-        if (!enabled) await android?.requestNotificationsPermission();
-      } catch (_) {}
-      const channel = AndroidNotificationChannel(
-        _channelId,
-        _channelName,
-        description: _channelDescription,
-        importance: Importance.max,
-      );
-      await android?.createNotificationChannel(channel);
+        if (!enabled) {
+          await android?.requestNotificationsPermission();
+        }
+      } catch (e) {
+        debugPrint('areNotificationsEnabled/requestPermission error: $e');
+      }
+
+      // Crie o canal (mesmo que já exista, é idempotente)
+      try {
+        const channel = AndroidNotificationChannel(
+          _channelId,
+          _channelName,
+          description: _channelDescription,
+          importance: Importance.max,
+        );
+        await android?.createNotificationChannel(channel);
+      } catch (e) {
+        debugPrint('createNotificationChannel error: $e');
+      }
     } else {
-      await _fcm.requestPermission(alert: true, badge: true, sound: true);
+      // iOS: peça permissão para FCM (e local, se quiser)
+      try {
+        await _fcm.requestPermission(alert: true, badge: true, sound: true);
+        final iosLocal = _local.resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+        await iosLocal?.requestPermissions(
+            alert: true, badge: true, sound: true);
+      } catch (e) {
+        debugPrint('iOS permission request error: $e');
+      }
     }
 
-    final token = await _fcm.getToken();
-    debugPrint('FCM Token: $token');
+    // ==== TOKEN FCM ====
+    try {
+      final token = await _fcm.getToken();
+      debugPrint('FCM Token: $token');
+    } catch (e) {
+      debugPrint('FCM getToken error: $e');
+    }
 
     _bindPushListenersOnce();
   }
