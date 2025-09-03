@@ -1,11 +1,13 @@
+// lib/models/food_estimate.dart
+
 class FoodItemEstimate {
   final String label;
   final double confidence; // 0..1
-  final int portionGrams; // g
-  final int calories; // kcal
-  final double? proteinG; // g
-  final double? carbsG; // g
-  final double? fatsG; // g
+  final int portionGrams;  // g
+  final int calories;      // kcal
+  final double? proteinG;  // g
+  final double? carbsG;    // g
+  final double? fatsG;     // g
 
   // densidades calculadas no client (não vêm do backend)
   final double kcalPerGram;
@@ -27,33 +29,48 @@ class FoodItemEstimate {
     this.fatsPerGram,
   });
 
-  factory FoodItemEstimate.fromJson(Map<String, dynamic> json) {
-    final portion = (json['portion_grams'] ?? 0) as int;
-    final kcal = (json['calories'] ?? 0) as int;
+  /// Helpers de parse defensivo
+  static int _asInt(dynamic v, {int fallback = 0}) {
+    if (v is int) return v;
+    if (v is num) return v.round();
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
+  }
 
-    // evitar divisão por zero
+  static double _asDouble(dynamic v, {double fallback = 0.0}) {
+    if (v is double) return v;
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.replaceAll(',', '.')) ?? fallback;
+    return fallback;
+  }
+
+  factory FoodItemEstimate.fromJson(Map<String, dynamic> json) {
+    final int portion = _asInt(json['portion_grams'], fallback: 0);
+    final int kcal = _asInt(json['calories'], fallback: 0);
     final double d = portion > 0 ? portion.toDouble() : 1.0;
 
-    final double? p = (json['protein_g'] != null)
-        ? (json['protein_g'] as num).toDouble()
+    final double? p = json.containsKey('protein_g')
+        ? _asDouble(json['protein_g'])
         : null;
-    final double? c =
-        (json['carbs_g'] != null) ? (json['carbs_g'] as num).toDouble() : null;
-    final double? f =
-        (json['fats_g'] != null) ? (json['fats_g'] as num).toDouble() : null;
+    final double? c = json.containsKey('carbs_g')
+        ? _asDouble(json['carbs_g'])
+        : null;
+    final double? f = json.containsKey('fats_g')
+        ? _asDouble(json['fats_g'])
+        : null;
 
     return FoodItemEstimate(
-      label: json['label'] ?? 'Item',
-      confidence: (json['confidence'] ?? 0).toDouble(),
+      label: (json['label'] ?? 'Item').toString(),
+      confidence: _asDouble(json['confidence'], fallback: 0.0).clamp(0.0, 1.0),
       portionGrams: portion,
       calories: kcal,
       proteinG: p,
       carbsG: c,
       fatsG: f,
       kcalPerGram: kcal / d,
-      proteinPerGram: p != null ? p / d : null,
-      carbsPerGram: c != null ? c / d : null,
-      fatsPerGram: f != null ? f / d : null,
+      proteinPerGram: p != null ? (p / d) : null,
+      carbsPerGram: c != null ? (c / d) : null,
+      fatsPerGram: f != null ? (f / d) : null,
     );
   }
 
@@ -77,7 +94,6 @@ class FoodItemEstimate {
     final newPortion = portionGrams ?? this.portionGrams;
     final double d = newPortion > 0 ? newPortion.toDouble() : 1.0;
 
-    // recalcula densidades se alterarmos porção/calorias/macros
     final int newCalories = calories ?? this.calories;
     final double? newProteinG = proteinG ?? this.proteinG;
     final double? newCarbsG = carbsG ?? this.carbsG;
@@ -104,19 +120,29 @@ class FoodEstimate {
   final List<FoodItemEstimate> items;
   final int totalCalories;
 
-  FoodEstimate(
-      {this.imageUrl, required this.items, required this.totalCalories});
+  FoodEstimate({
+    this.imageUrl,
+    required this.items,
+    required this.totalCalories,
+  });
 
+  /// Aceita tanto `{ "data": {...} }` quanto `{ ... }`
   factory FoodEstimate.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? {};
-    final items = (data['items'] as List<dynamic>? ?? [])
-        .map((e) => FoodItemEstimate.fromJson(e as Map<String, dynamic>))
+    final Map<String, dynamic> root =
+        (json['data'] is Map<String, dynamic>) ? (json['data'] as Map<String, dynamic>) : json;
+
+    final List<dynamic> rawItems = (root['items'] as List<dynamic>?) ?? const [];
+    final items = rawItems
+        .whereType<Map<String, dynamic>>()
+        .map((e) => FoodItemEstimate.fromJson(e))
         .toList();
 
+    final int total = FoodItemEstimate._asInt(root['total_calories'], fallback: 0);
+
     return FoodEstimate(
-      imageUrl: data['image_url'] as String?,
+      imageUrl: root['image_url'] as String?,
       items: items,
-      totalCalories: data['total_calories'] ?? 0,
+      totalCalories: total,
     );
   }
 
@@ -127,8 +153,7 @@ class FoodEstimate {
         if (takenAt != null) 'taken_at': takenAt.toIso8601String(),
       };
 
-  Map<String, dynamic> toMealLogPayload({DateTime? consumedAt, int? dietId}) =>
-      {
+  Map<String, dynamic> toMealLogPayload({DateTime? consumedAt, int? dietId}) => {
         if (dietId != null) 'diet_id': dietId,
         if (consumedAt != null) 'consumed_at': consumedAt.toIso8601String(),
         'items': items
@@ -143,9 +168,13 @@ class FoodEstimate {
             .toList(),
       };
 
-  FoodEstimate copyWith({List<FoodItemEstimate>? items, int? totalCalories}) {
+  FoodEstimate copyWith({
+    List<FoodItemEstimate>? items,
+    int? totalCalories,
+    String? imageUrl,
+  }) {
     return FoodEstimate(
-      imageUrl: imageUrl,
+      imageUrl: imageUrl ?? this.imageUrl,
       items: items ?? this.items,
       totalCalories: totalCalories ?? this.totalCalories,
     );
