@@ -27,14 +27,13 @@ import '../models/feature_flags.dart';
 import '../models/food_estimate.dart';
 
 class Env {
-  // Ex.: --dart-define=API_BASE_URL=http://10.0.2.2:33366/api/v1
+  // Ex.: --dart-define=API_BASE_URL=https://dietamais.com/api/v1
   static const _defined = String.fromEnvironment('API_BASE_URL');
 
-  // Fallbacks por plataforma
+  // Fallbacks por plataforma (SEM barra no final; SEM porta fixa)
   static String get _fallback {
     if (kIsWeb) return 'http://127.0.0.1/api/v1';
-    if (Platform.isAndroid)
-      return 'http://10.0.2.2/api/v1'; // Emulador Android
+    if (Platform.isAndroid) return 'http://10.0.2.2/api/v1'; // Emulador Android
     return 'http://127.0.0.1/api/v1'; // iOS sim / desktop
   }
 
@@ -263,14 +262,14 @@ class ApiService {
   // --- USUÁRIO ---
 
   Future<User> getUser(String token) async {
-    final uri = _uRoot('user'); // /api/user (sem /v1)
+    final uri = _u('user'); // /api/v1/user
     final res = await http.get(uri, headers: {
       'Accept': 'application/json',
       'Authorization': 'Bearer $token'
     });
     if (res.statusCode == 200) return User.fromJson(jsonDecode(res.body));
     throw Exception(
-        'The route ${uri.path} could not be found. Status ${res.statusCode}. Body: ${res.body}');
+        'Falha ao carregar o usuário (HTTP ${res.statusCode}) Body: ${res.body}');
   }
 
   Future<User> updateUserProfile({
@@ -459,7 +458,7 @@ class ApiService {
 
   Future<Map<String, bool>> getUserSettings(String token) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/user/settings'),
+      Uri.parse('$_baseUrl/user/status'),
       headers: {'Accept': 'application/json', 'Authorization': 'Bearer $token'},
     );
     if (response.statusCode == 200) {
@@ -471,7 +470,7 @@ class ApiService {
   Future<void> updateUserSettings(
       String token, Map<String, bool> settings) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl/user/settings'),
+      Uri.parse('$_baseUrl/user/status'),
       headers: {
         'Content-Type': 'application/json; charset=UTF-8',
         'Accept': 'application/json',
@@ -660,13 +659,15 @@ class ApiService {
   }
 
   Future<bool> checkUserStatus(String token) async {
-    final uri = Uri.parse('${_baseUrl.replaceAll("/v1", "")}/user/status');
-    final response = await http.get(uri, headers: {
+    final uri = _u('user/status'); // /api/v1/user/status
+    final res = await http.get(uri, headers: {
       'Accept': 'application/json',
       'Authorization': 'Bearer $token'
     });
-    if (response.statusCode == 200)
-      return jsonDecode(response.body)['has_active_diet'];
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return body['has_active_diet'] == true;
+    }
     return false;
   }
 

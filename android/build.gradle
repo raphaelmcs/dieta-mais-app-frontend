@@ -8,8 +8,7 @@ allprojects {
 rootProject.buildDir = '../build'
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
+    // se não precisar, pode remover a linha abaixo
     project.evaluationDependsOn(':app')
 }
 
